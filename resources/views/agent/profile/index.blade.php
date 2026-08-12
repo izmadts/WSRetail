@@ -1,0 +1,27 @@
+@extends('layouts.agent')
+@section('title', 'My Profile')
+@section('page-title', 'My Profile')
+@section('content')
+<div class="bg-white rounded-xl shadow-card overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-200"><h3 class="text-lg font-semibold"><i class="fas fa-user-edit text-green-600 mr-2"></i> Edit Profile</h3></div>
+    <div class="p-6">
+        <form action="{{ route('agent.profile.update') }}" method="POST">
+            @csrf @method('PUT')
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div><label class="block text-sm font-medium text-gray-700">Name *</label><input type="text" name="name" value="{{ old('name', $agent->name) }}" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"></div>
+                <div><label class="block text-sm font-medium text-gray-700">Email *</label><input type="email" name="email" value="{{ old('email', $agent->email) }}" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"></div>
+                <div><label class="block text-sm font-medium text-gray-700">Phone</label><input type="text" name="phone" value="{{ old('phone', $agent->phone) }}" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"></div>
+                <div><label class="block text-sm font-medium text-gray-700">WhatsApp</label><input type="text" name="whatsapp_number" value="{{ old('whatsapp_number', $agent->whatsapp_number) }}" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"></div>
+                <div><label class="block text-sm font-medium text-gray-700">City</label><input type="text" name="city" value="{{ old('city', $agent->city) }}" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"></div>
+                <div class="md:col-span-2"><label class="block text-sm font-medium text-gray-700">Address</label><textarea name="address" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">{{ old('address', $agent->address) }}</textarea></div>
+                <div><label class="block text-sm font-medium text-gray-700">Payout Account Type</label><select name="payout_account_type" class="w-full px-3 py-2 border border-gray-300 rounded-lg"><option value="">Select</option><option value="bank" {{ $agent->payout_account_type=='bank'?'selected':'' }}>Bank</option><option value="easypaisa" {{ $agent->payout_account_type=='easypaisa'?'selected':'' }}>Easypaisa</option><option value="jazzcash" {{ $agent->payout_account_type=='jazzcash'?'selected':'' }}>JazzCash</option></select></div>
+                <div><label class="block text-sm font-medium text-gray-700">Account Title</label><input type="text" name="payout_account_title" value="{{ old('payout_account_title', $agent->payout_account_title) }}" class="w-full px-3 py-2 border border-gray-300 rounded-lg"></div>
+                <div><label class="block text-sm font-medium text-gray-700">Account Number</label><input type="text" name="payout_account_number" value="{{ old('payout_account_number', $agent->payout_account_number) }}" class="w-full px-3 py-2 border border-gray-300 rounded-lg"></div>
+                <div><label class="block text-sm font-medium text-gray-700">Provider</label><input type="text" name="payout_account_provider" value="{{ old('payout_account_provider', $agent->payout_account_provider) }}" class="w-full px-3 py-2 border border-gray-300 rounded-lg"></div>
+                <div class="md:col-span-2"><hr><p class="text-sm font-medium text-gray-700">Change Password (leave blank to keep)</p><div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2"><div><label class="block text-sm font-medium text-gray-700">New Password</label><div x-data="{ showPassword: false }" class="relative"><input :type="showPassword ? 'text' : 'password'" name="password" class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg"><button type="button" @click="showPassword = !showPassword" tabindex="-1" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-green-600"><i class="fas" :class="showPassword ? 'fa-eye-slash' : 'fa-eye'"></i></button></div></div><div><label class="block text-sm font-medium text-gray-700">Confirm Password</label><div x-data="{ showPassword: false }" class="relative"><input :type="showPassword ? 'text' : 'password'" name="password_confirmation" class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg"><button type="button" @click="showPassword = !showPassword" tabindex="-1" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-green-600"><i class="fas" :class="showPassword ? 'fa-eye-slash' : 'fa-eye'"></i></button></div></div></div></div>
+            </div>
+            <div class="mt-6 flex gap-3"><button type="submit" class="px-6 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700">Update Profile</button><a href="{{ route('agent.dashboard') }}" class="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300">Cancel</a></div>
+        </form>
+    </div>
+</div>
+@endsection

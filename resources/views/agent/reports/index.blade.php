@@ -1,0 +1,20 @@
+@extends('layouts.agent')
+@section('title', 'Reports')
+@section('page-title', 'Reports Dashboard')
+@section('content')
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div class="bg-white rounded-xl shadow-card p-6"><div class="flex items-center justify-between"><div><p class="text-sm font-medium text-gray-500">Total Customers</p><p class="text-2xl font-bold text-gray-900">{{ $totalCustomers??0 }}</p></div><div class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center"><i class="fas fa-users text-blue-600 text-xl"></i></div></div></div>
+    <div class="bg-white rounded-xl shadow-card p-6"><div class="flex items-center justify-between"><div><p class="text-sm font-medium text-gray-500">Active Customers</p><p class="text-2xl font-bold text-green-600">{{ $activeCustomers??0 }}</p></div><div class="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center"><i class="fas fa-user-check text-green-600 text-xl"></i></div></div></div>
+    <div class="bg-white rounded-xl shadow-card p-6"><div class="flex items-center justify-between"><div><p class="text-sm font-medium text-gray-500">Total Sales</p><p class="text-2xl font-bold text-blue-600">Rs. {{ number_format($totalSales??0,2) }}</p></div><div class="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center"><i class="fas fa-shopping-cart text-purple-600 text-xl"></i></div></div></div>
+    <div class="bg-white rounded-xl shadow-card p-6"><div class="flex items-center justify-between"><div><p class="text-sm font-medium text-gray-500">Total Commission</p><p class="text-2xl font-bold text-purple-600">Rs. {{ number_format($totalCommission??0,2) }}</p></div><div class="w-12 h-12 bg-yellow-100 rounded-xl flex items-center justify-center"><i class="fas fa-coins text-yellow-600 text-xl"></i></div></div></div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+    <div class="bg-white rounded-xl shadow-card overflow-hidden"><div class="px-6 py-4 border-b"><h4 class="text-lg font-semibold"><i class="fas fa-chart-line mr-2"></i> Monthly Sales</h4><p class="text-sm text-gray-500">Rs. {{ number_format($monthlySales??0,2) }}</p></div><div class="p-6 text-center text-gray-400"><i class="fas fa-chart-bar text-4xl mb-2 block"></i><p>Chart coming soon</p></div></div>
+    <div class="bg-white rounded-xl shadow-card overflow-hidden"><div class="px-6 py-4 border-b"><h4 class="text-lg font-semibold"><i class="fas fa-coins mr-2"></i> Monthly Commission</h4><p class="text-sm text-gray-500">Rs. {{ number_format($monthlyCommission??0,2) }}</p></div><div class="p-6 text-center text-gray-400"><i class="fas fa-chart-pie text-4xl mb-2 block"></i><p>Chart coming soon</p></div></div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+    <a href="{{ route('agent.reports.sales') }}" class="bg-white rounded-xl shadow-card p-6 hover:shadow-lg"><div class="flex items-center"><div class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center"><i class="fas fa-file-invoice text-blue-600 text-xl"></i></div><div class="ml-4"><h4 class="font-semibold">Sales Report</h4><p class="text-sm text-gray-500">View sales details</p></div></div></a>
+    <a href="{{ route('agent.reports.commission') }}" class="bg-white rounded-xl shadow-card p-6 hover:shadow-lg"><div class="flex items-center"><div class="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center"><i class="fas fa-coins text-purple-600 text-xl"></i></div><div class="ml-4"><h4 class="font-semibold">Commission Report</h4><p class="text-sm text-gray-500">Commission details</p></div></div></a>
+    <a href="{{ route('agent.reports.target') }}" class="bg-white rounded-xl shadow-card p-6 hover:shadow-lg"><div class="flex items-center"><div class="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center"><i class="fas fa-bullseye text-red-600 text-xl"></i></div><div class="ml-4"><h4 class="font-semibold">Target Report</h4><p class="text-sm text-gray-500">Target vs achievement</p></div></div></a>
+</div>
+@endsection
