@@ -35,12 +35,37 @@ return [
         ],
     ],
 
-    // Shared secret the seller app's backend sends as X-Integration-Key on
+    // Shared secret the storefront's backend sends as X-Integration-Key on
     // POST /api/v1/customer/connect - the customer API's only "system to
     // system" trust boundary, since /connect hands out a Sanctum token for
     // any phone number it's given and has no password to check instead.
     'customer_api' => [
         'integration_key' => env('CUSTOMER_API_INTEGRATION_KEY'),
+    ],
+
+    // Where the license page's "Buy a license" form (locked/unactivated
+    // installs) sends its request. Not env-driven for bank_* - every
+    // install of this public codebase should show the SAME owner details,
+    // the same way the WhatsApp/email contact chips next to it are
+    // hardcoded rather than per-install configurable.
+    'license_purchase' => [
+        'notify_email' => env('LICENSE_PURCHASE_NOTIFY_EMAIL', 'izmadts@gmail.com'),
+        'amount' => 10000,
+        'currency' => 'PKR',
+        'bank_name' => 'Bank Alfalah',
+        'account_title' => 'Mubashar Irshad',
+        'account_number' => '55585000106471',
+        'iban' => 'PK59ALFH5558005000106471',
+        'branch' => '5558',
+    ],
+
+    // Remote license-validation server this install activates/checks in
+    // against. See App\Services\LicenseService.
+    'license_server' => [
+        'url' => env('LICENSE_SERVER_URL', 'https://license.wsretail.example.com'),
+        'grace_days' => env('LICENSE_GRACE_DAYS', 7),
+        'timeout' => env('LICENSE_HTTP_TIMEOUT', 5),
+        'recheck_interval_hours' => env('LICENSE_RECHECK_INTERVAL_HOURS', 6),
     ],
 
 ];

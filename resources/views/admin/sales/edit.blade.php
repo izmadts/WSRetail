@@ -32,20 +32,21 @@
                         <p class="mt-1 text-xs text-gray-500" x-show="customer_id" x-text="priceField === 'wholesale_price' ? 'Wholesale pricing applies' : 'Retail pricing applies'"></p>
                     </div>
 
+                    @if($locations->isNotEmpty())
                     <div>
                         <label class="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
-                            Agent
-                            <x-help-tooltip>Selecting an agent credits them with commission on this sale, calculated per their commission tier (shown as "Est. Commission" below) - it doesn't change what the customer pays. Leave blank for a walk-in / no-agent sale.</x-help-tooltip>
+                            Location
+                            <x-help-tooltip>Each location's POS Use (set in Settings &gt; Locations) can lock this sale to Retail-only or Wholesale-only products/pricing, overriding the customer group's default. Leave blank if this sale isn't tied to a specific location.</x-help-tooltip>
                         </label>
-                        <select name="agent_id" x-model="agent_id" @change="calculateTotals()" class="w-full px-2 sm:px-3 py-1.5 sm:py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <option value="">Select Agent</option>
-                            @foreach($agents as $agent)
-                            <option value="{{ $agent->id }}" {{ $sale->agent_id == $agent->id ? 'selected' : '' }}>
-                                {{ $agent->name }}
-                            </option>
+                        <select name="location_id" x-model="location_id" @change="onLocationChange($event)" class="w-full px-2 sm:px-3 py-1.5 sm:py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="">No specific location</option>
+                            @foreach($locations as $loc)
+                            <option value="{{ $loc->id }}" data-pos-type="{{ $loc->pos_type }}" {{ $sale->location_id == $loc->id ? 'selected' : '' }}>{{ $loc->name }} ({{ ucfirst($loc->pos_type) }})</option>
                             @endforeach
                         </select>
+                        <p class="mt-1 text-xs text-gray-500" x-show="locationType && locationType !== 'both'" x-text="'Locked to ' + locationType + ' products/pricing at this location'"></p>
                     </div>
+                    @endif
 
                     <div>
                         <label class="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Date <span class="text-red-500">*</span></label>
@@ -119,7 +120,13 @@
                                             <select :name="'items['+index+'][product_id]'" x-model="item.product_id" @change="onProductChange(index)" class="w-full px-2 py-1 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
                                                 <option value="">Select Product</option>
                                                 <template x-for="p in visibleProducts(item.product_id)" :key="p.id">
-                                                    <option :value="p.id" x-text="p.name + ' (' + p.code + ') - Stock: ' + p.current_stock"></option>
+                                                    <option :value="p.id" x-text="p.name + ' (' + p.code + ')' + (p.has_variants ? '' : ' - Stock: ' + p.current_stock)"></option>
+                                                </template>
+                                            </select>
+                                            <select x-show="hasVariants(item.product_id)" :name="'items['+index+'][product_variant_id]'" x-model="item.product_variant_id" @change="onVariantChange(index)" class="w-full mt-1 px-2 py-1 text-sm border border-gray-300 rounded-lg bg-white">
+                                                <option value="">Select Variant</option>
+                                                <template x-for="v in variantsFor(item.product_id)" :key="v.id">
+                                                    <option :value="v.id" x-text="v.label + ' - Stock: ' + v.current_stock"></option>
                                                 </template>
                                             </select>
                                             <p class="mt-1 text-xs" x-show="item.product_id">
@@ -160,7 +167,13 @@
                                 <select :name="'items['+index+'][product_id]'" x-model="item.product_id" @change="onProductChange(index)" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg bg-white">
                                     <option value="">Select Product</option>
                                     <template x-for="p in visibleProducts(item.product_id)" :key="p.id">
-                                        <option :value="p.id" x-text="p.name + ' - Stock: ' + p.current_stock"></option>
+                                        <option :value="p.id" x-text="p.name + (p.has_variants ? '' : ' - Stock: ' + p.current_stock)"></option>
+                                    </template>
+                                </select>
+                                <select x-show="hasVariants(item.product_id)" :name="'items['+index+'][product_variant_id]'" x-model="item.product_variant_id" @change="onVariantChange(index)" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg bg-white">
+                                    <option value="">Select Variant</option>
+                                    <template x-for="v in variantsFor(item.product_id)" :key="v.id">
+                                        <option :value="v.id" x-text="v.label + ' - Stock: ' + v.current_stock"></option>
                                     </template>
                                 </select>
                                 <p class="text-xs" x-show="item.product_id">
@@ -222,11 +235,6 @@
                                 <input type="number" step="0.01" name="shipping_cost" x-model="shipping" @input="calculateTotals()" class="w-24 px-2 py-1 text-sm text-right border border-gray-300 rounded-lg" min="0" step="0.01">
                                 <span class="text-sm" x-text="'Rs. ' + shipping.toFixed(2)"></span>
                             </div>
-                            <div class="flex items-center gap-2 justify-end border-t border-gray-200 pt-2" x-show="agent_id">
-                                <span class="text-sm font-semibold text-gray-700">Est. Commission:</span>
-                                <span class="text-sm font-semibold text-purple-600" x-text="'Rs. ' + commissionAmount.toFixed(2)"></span>
-                            </div>
-                            <p class="text-xs text-gray-500 text-right" x-show="agent_id" x-text="commissionNote"></p>
                             <div class="flex items-center gap-2 justify-end bg-blue-50 p-2 rounded-lg border-2 border-blue-200">
                                 <span class="text-base font-bold text-gray-700">Grand Total:</span>
                                 <span class="text-lg font-bold text-blue-600" x-text="'Rs. ' + grandTotal.toFixed(2)"></span>
@@ -256,6 +264,7 @@
     // @json() on a single simple variable is safe.
     $existingItemsForJs = $sale->items->map(fn ($item) => [
         'product_id' => $item->product_id,
+        'product_variant_id' => $item->product_variant_id,
         'quantity' => (float) $item->quantity,
         'unit_price' => (float) $item->unit_price,
         'discount' => (float) $item->discount,
@@ -264,21 +273,25 @@
         'stock' => null,
         'cost' => null,
     ])->values();
-    $initialPriceField = $sale->customer->customerGroup->price_field ?? 'sale_price';
+    $initialCustomerPriceField = $sale->customer->customerGroup->price_field ?? 'sale_price';
+    $initialPriceField = match ($sale->location->pos_type ?? 'both') {
+        'retail' => 'sale_price',
+        'wholesale' => 'wholesale_price',
+        default => $initialCustomerPriceField,
+    };
 @endphp
 
 <script>
 function saleForm() {
     var existingItems = @json($existingItemsForJs);
-    var cashTiers = @json($commissionPreview['cash_tiers']);
-    var creditRate = @json($commissionPreview['credit_rate']);
-    var agentMtdCash = @json($commissionPreview['agent_mtd_cash']);
     var allProducts = @json($productsForJs);
 
     return {
         items: existingItems.length > 0 ? existingItems : [],
         customer_id: {{ $sale->customer_id }},
-        agent_id: {{ $sale->agent_id ?? 'null' }},
+        location_id: {{ $sale->location_id ?? 'null' }},
+        locationType: '{{ $sale->location->pos_type ?? '' }}',
+        customerPriceField: '{{ $initialCustomerPriceField }}',
         payment_term: '{{ $sale->payment_term }}',
         priceField: '{{ $initialPriceField }}',
         discount: {{ (float) $sale->discount ?? 0 }},
@@ -287,8 +300,6 @@ function saleForm() {
         shipping: {{ (float) $sale->shipping_cost ?? 0 }},
         subTotal: 0,
         discountAmount: 0,
-        commissionAmount: 0,
-        commissionNote: '',
         grandTotal: 0,
         confirmBelowCost: false,
         allProducts: allProducts,
@@ -304,9 +315,25 @@ function saleForm() {
         // dropdown, never on page load - so an existing sale's items are
         // never auto-cleared just because the product catalog moved on.
         onCustomerChange: function(event) {
-            var self = this;
             var option = event.target.selectedOptions[0];
-            this.priceField = (option && option.dataset.priceField) ? option.dataset.priceField : 'sale_price';
+            this.customerPriceField = (option && option.dataset.priceField) ? option.dataset.priceField : 'sale_price';
+            this.refreshPriceField();
+        },
+
+        onLocationChange: function(event) {
+            var option = event.target.selectedOptions[0];
+            this.locationType = (option && option.dataset.posType) ? option.dataset.posType : '';
+            this.refreshPriceField();
+        },
+
+        // A location locked to Retail/Wholesale overrides the customer
+        // group's price field entirely - "Both" or no location selected
+        // falls back to the customer group as before.
+        refreshPriceField: function() {
+            var self = this;
+            this.priceField = this.locationType === 'retail' ? 'sale_price'
+                : this.locationType === 'wholesale' ? 'wholesale_price'
+                : this.customerPriceField;
 
             this.items.forEach(function(item, index) {
                 if (!item.product_id) return;
@@ -314,11 +341,14 @@ function saleForm() {
                 var stillAllowed = product && (self.priceField === 'wholesale_price' ? product.is_wholesale : product.is_retail);
                 if (!stillAllowed) {
                     item.product_id = '';
+                    item.product_variant_id = '';
                     item.unit_price = 0;
                     item.stock = null;
                     item.cost = null;
                 } else {
-                    item.unit_price = self.priceField === 'wholesale_price' ? product.wholesale_price : product.sale_price;
+                    var variant = item.product_variant_id ? product.variants.find(function(v) { return v.id == item.product_variant_id; }) : null;
+                    var priceSource = variant || product;
+                    item.unit_price = self.priceField === 'wholesale_price' ? priceSource.wholesale_price : priceSource.sale_price;
                 }
                 self.calculateRow(index);
             });
@@ -331,8 +361,18 @@ function saleForm() {
             });
         },
 
+        hasVariants: function(productId) {
+            var product = this.allProducts.find(function(p) { return p.id == productId; });
+            return !!(product && product.has_variants);
+        },
+
+        variantsFor: function(productId) {
+            var product = this.allProducts.find(function(p) { return p.id == productId; });
+            return product ? product.variants : [];
+        },
+
         addRow: function() {
-            this.items.push({ product_id: '', quantity: 1, unit_price: 0, discount: 0, tax: 0, total: 0, stock: null, cost: null });
+            this.items.push({ product_id: '', product_variant_id: '', quantity: 1, unit_price: 0, discount: 0, tax: 0, total: 0, stock: null, cost: null });
             this.calculateTotals();
         },
 
@@ -345,12 +385,30 @@ function saleForm() {
 
         onProductChange: function(index) {
             var item = this.items[index];
+            item.product_variant_id = '';
             var product = this.allProducts.find(function(p) { return p.id == item.product_id; });
-            if (product) {
+            if (product && !product.has_variants) {
                 item.unit_price = this.priceField === 'wholesale_price' ? product.wholesale_price : product.sale_price;
                 item.cost = product.purchase_price;
                 item.stock = product.current_stock;
             } else {
+                item.unit_price = 0;
+                item.stock = null;
+                item.cost = null;
+            }
+            this.calculateRow(index);
+        },
+
+        onVariantChange: function(index) {
+            var item = this.items[index];
+            var product = this.allProducts.find(function(p) { return p.id == item.product_id; });
+            var variant = product ? product.variants.find(function(v) { return v.id == item.product_variant_id; }) : null;
+            if (variant) {
+                item.unit_price = this.priceField === 'wholesale_price' ? variant.wholesale_price : variant.sale_price;
+                item.cost = variant.purchase_price;
+                item.stock = variant.current_stock;
+            } else {
+                item.unit_price = 0;
                 item.stock = null;
                 item.cost = null;
             }
@@ -391,16 +449,6 @@ function saleForm() {
             this.calculateTotals();
         },
 
-        rateForCumulative: function(cumulative, tiers) {
-            for (var i = 0; i < tiers.length; i++) {
-                var t = tiers[i];
-                if (t.to === null || t.to === undefined || cumulative <= t.to) {
-                    return parseFloat(t.rate);
-                }
-            }
-            return tiers.length ? parseFloat(tiers[tiers.length - 1].rate) : 0;
-        },
-
         calculateTotals: function() {
             var self = this;
             this.subTotal = this.items.reduce(function(sum, item) {
@@ -413,25 +461,7 @@ function saleForm() {
             var tax = parseFloat(this.tax) || 0;
             var shipping = parseFloat(this.shipping) || 0;
 
-            var netTotal = this.subTotal - this.discountAmount + tax + shipping;
-
-            if (this.agent_id && this.payment_term === 'cash') {
-                var mtd = parseFloat(agentMtdCash[this.agent_id]) || 0;
-                var cumulative = mtd + netTotal;
-                var rate = this.rateForCumulative(cumulative, cashTiers);
-                this.commissionAmount = netTotal * rate / 100;
-                this.commissionNote = rate + '% bracket (month-to-date cash: Rs. ' + mtd.toFixed(0) + ', excluding this sale)';
-            } else if (this.agent_id && this.payment_term === 'credit') {
-                this.commissionAmount = netTotal * creditRate / 100;
-                this.commissionNote = 'Estimate if fully recovered - credit sales accrue ' + creditRate + '% per payment received, not upfront.';
-            } else {
-                this.commissionAmount = 0;
-                this.commissionNote = '';
-            }
-
-            // Commission is an internal cost paid to the agent, not
-            // something added to what the customer owes.
-            this.grandTotal = netTotal;
+            this.grandTotal = this.subTotal - this.discountAmount + tax + shipping;
         },
 
         onSubmit: function(event) {

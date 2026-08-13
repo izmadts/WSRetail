@@ -9,16 +9,15 @@ use Illuminate\Http\Request;
 class ProductController extends ApiController
 {
     /**
-     * The customer (seller-app/Mandi) API is a wholesale-only channel -
-     * always wholesale_price/is_wholesale, unconditionally. Not driven by
-     * customer_group or by whether the customer has an agent - see the
-     * same note on OrderController::resolveChannel.
+     * The customer/storefront API is a retail-only channel - always
+     * sale_price/is_retail, unconditionally. Not driven by customer_group -
+     * see the same note on OrderController::resolveChannel.
      */
     public function index(Request $request)
     {
-        $query = Product::active()->where('current_stock', '>', 0)
-            ->where('is_wholesale', true)
-            ->with('category')
+        $query = Product::active()->inStock()
+            ->where('is_retail', true)
+            ->with('category', 'variants')
             ->orderBy('name');
 
         if ($request->filled('search')) {
@@ -36,8 +35,8 @@ class ProductController extends ApiController
 
         $data = $products->map(function ($product) {
             $resource = (new ProductResource($product))->resolve();
-            $resource['price'] = (float) $product->wholesale_price;
-            $resource['price_field'] = 'wholesale_price';
+            $resource['price'] = (float) ($product->has_variants ? $product->variants->min('sale_price') : $product->sale_price);
+            $resource['price_field'] = 'sale_price';
             return $resource;
         });
 

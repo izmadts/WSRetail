@@ -7,11 +7,11 @@ use App\Http\Middleware\RoleMiddleware;
 use App\Http\Middleware\LogActivity;
 use App\Http\Middleware\RedirectIfAuthenticated;
 use App\Http\Middleware\PermissionMiddleware;
-use App\Http\Middleware\EnsureAgentActive;
 use App\Http\Middleware\EnsureCustomerActive;
 use App\Http\Middleware\VerifyIntegrationKey;
 use App\Http\Middleware\EnsureNotInstalled;
 use App\Http\Middleware\PreventSearchIndexing;
+use App\Http\Middleware\EnsureLicensed;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -33,10 +33,10 @@ return Application::configure(basePath: dirname(__DIR__))
             'log.activity' => LogActivity::class,
             'guest' => RedirectIfAuthenticated::class,
             'permission' => PermissionMiddleware::class,
-            'agent.active' => EnsureAgentActive::class,
             'customer.active' => EnsureCustomerActive::class,
             'integration.key' => VerifyIntegrationKey::class,
             'not.installed' => EnsureNotInstalled::class,
+            'license' => EnsureLicensed::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

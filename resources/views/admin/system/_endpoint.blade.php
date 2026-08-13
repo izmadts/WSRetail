@@ -7,7 +7,7 @@
         'DELETE' => 'bg-red-100 text-red-800',
     ];
     $auth = $auth ?? true;
-    $base = $base ?? '/api/v1/agent';
+    $base = $base ?? '/api/v1/customer';
 @endphp
 <div class="border border-gray-200 rounded-lg p-4 mb-3">
     <div class="flex flex-wrap items-center gap-2 mb-2">

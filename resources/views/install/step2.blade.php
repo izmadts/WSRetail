@@ -98,8 +98,18 @@
 
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Company Address</label>
-                        <textarea name="company_address" rows="2" 
+                        <textarea name="company_address" rows="2"
                                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">{{ old('company_address') }}</textarea>
+                    </div>
+
+                    <h3 class="font-semibold text-gray-700 border-b pb-2 mt-4">License</h3>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">License Key <span class="text-red-500">*</span></label>
+                        <input type="text" name="license_key" value="{{ old('license_key') }}" required placeholder="WSR-XXXXX-XXXXX-XXXXX-XXXXX"
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg font-mono focus:ring-2 focus:ring-blue-500">
+                        <p class="text-xs text-gray-500 mt-1">Checked against the license server and locked to this domain. Installation won't complete without a valid key.</p>
+                        @error('license_key')<p class="mt-1 text-xs text-red-500">{{ $message }}</p>@enderror
                     </div>
                 </div>
 

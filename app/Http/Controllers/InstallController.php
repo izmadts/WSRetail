@@ -10,12 +10,13 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use App\Models\User;
 use App\Models\Setting;
+use App\Services\LicenseService;
 use Database\Seeders\AccountSeeder;
 use Database\Seeders\CategorySeeder;
 use Database\Seeders\ExpenseCategorySeeder;
 use Database\Seeders\IncomeCategorySeeder;
 use Database\Seeders\CustomerGroupSeeder;
-use Database\Seeders\CommissionSettingsSeeder;
+use Database\Seeders\CustomerCreditSettingsSeeder;
 use Database\Seeders\RolePermissionSeeder;
 
 /**
@@ -28,9 +29,9 @@ use Database\Seeders\RolePermissionSeeder;
  * demo staff users, fake suppliers, and fake customers (see
  * database/seeders/DatabaseSeeder.php), which has no place on a real,
  * live install. Only structural defaults (chart of accounts, product/expense/
- * income categories, customer groups, and commission policy defaults, role
- * permissions) are seeded here - the one real account created is the admin
- * from this form, never a seeded placeholder.
+ * income categories, customer groups, and customer credit policy defaults,
+ * role permissions) are seeded here - the one real account created is the
+ * admin from this form, never a seeded placeholder.
  */
 class InstallController extends Controller
 {
@@ -123,6 +124,7 @@ class InstallController extends Controller
             'company_logo' => 'nullable|image|mimes:jpeg,png,jpg,svg|max:2048',
             'company_phone' => 'nullable|string|max:50',
             'company_address' => 'nullable|string',
+            'license_key' => 'required|string|max:255',
         ]);
 
         // Point the REAL 'mysql' connection at the submitted database for
@@ -146,13 +148,23 @@ class InstallController extends Controller
         // page instead of failing.
         Artisan::call('migrate', ['--force' => true]);
 
+        // License is checked right after migrate (the `license` table now
+        // exists) and before any seeding/admin-account creation - a bad key
+        // aborts here with nothing else committed except the (idempotent,
+        // harmless) schema. The wizard can just be resubmitted with a
+        // correct key.
+        $licenseResult = app(LicenseService::class)->activate($validated['license_key']);
+        if (!$licenseResult['ok']) {
+            return back()->withInput()->with('error', 'License activation failed: ' . $licenseResult['message']);
+        }
+
         foreach ([
             AccountSeeder::class,
             CategorySeeder::class,
             ExpenseCategorySeeder::class,
             IncomeCategorySeeder::class,
             CustomerGroupSeeder::class,
-            CommissionSettingsSeeder::class,
+            CustomerCreditSettingsSeeder::class,
             RolePermissionSeeder::class,
         ] as $seeder) {
             Artisan::call('db:seed', ['--class' => $seeder, '--force' => true]);
@@ -256,13 +268,13 @@ class InstallController extends Controller
             'DB_DATABASE' => $dbConfig['db_database'],
             'DB_USERNAME' => $dbConfig['db_username'],
             'DB_PASSWORD' => $dbConfig['db_password'] ?? '',
-            // Shared secret the Mandi/seller-app customer API requires on
-            // every request (VerifyIntegrationKey middleware). .env.example
-            // ships it blank, which fails closed rather than open, but that
-            // leaves the whole customer API silently dead until someone
-            // notices and sets it by hand. Generating a real one here means
-            // it works immediately - whoever wires up the seller app just
-            // copies this value from the live .env.
+            // Shared secret the customer/storefront API requires on every
+            // request to /connect (VerifyIntegrationKey middleware).
+            // .env.example ships it blank, which fails closed rather than
+            // open, but that leaves the whole customer API silently dead
+            // until someone notices and sets it by hand. Generating a real
+            // one here means it works immediately - whoever wires up the
+            // storefront just copies this value from the live .env.
             'CUSTOMER_API_INTEGRATION_KEY' => Str::random(64),
         ];
 

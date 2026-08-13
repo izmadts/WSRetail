@@ -131,7 +131,7 @@ class SalesReturnController extends Controller
                 ]);
             }
 
-            // Items now exist - safe to reverse stock/accounting/commission.
+            // Items now exist - safe to reverse stock/accounting.
             // (This used to run in a model created() hook that fired before
             // any items existed, making it a silent no-op.)
             $salesReturn->load('items.product');

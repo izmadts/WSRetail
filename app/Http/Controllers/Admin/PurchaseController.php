@@ -34,8 +34,9 @@ class PurchaseController extends Controller
     public function create()
     {
         $suppliers = Supplier::active()->orderBy('name')->get();
-        $products = Product::active()->orderBy('name')->get();
-        return view('admin.purchases.create', compact('suppliers', 'products'));
+        $products = Product::active()->with('activeVariants.attributeValues')->orderBy('name')->get();
+        $productVariants = $this->productVariantsForJs($products);
+        return view('admin.purchases.create', compact('suppliers', 'products', 'productVariants'));
     }
 
     public function store(Request $request)
@@ -53,6 +54,7 @@ class PurchaseController extends Controller
             'notes' => 'nullable|string',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
+            'items.*.product_variant_id' => 'nullable|exists:product_variants,id',
             'items.*.quantity' => 'required|numeric|min:0.01',
             'items.*.unit_price' => 'required|numeric|min:0',
             'items.*.discount' => 'nullable|numeric|min:0',
@@ -73,6 +75,7 @@ class PurchaseController extends Controller
                     $subTotal += $totalPrice;
                     $itemsData[] = [
                         'product_id' => $item['product_id'],
+                        'product_variant_id' => $item['product_variant_id'] ?? null,
                         'quantity' => $item['quantity'],
                         'unit_price' => $item['unit_price'],
                         'discount' => $item['discount'] ?? 0,
@@ -160,9 +163,10 @@ class PurchaseController extends Controller
         }
 
         $suppliers = Supplier::active()->orderBy('name')->get();
-        $products = Product::active()->orderBy('name')->get();
+        $products = Product::active()->with('activeVariants.attributeValues')->orderBy('name')->get();
+        $productVariants = $this->productVariantsForJs($products);
         $purchase->load('items');
-        return view('admin.purchases.edit', compact('purchase', 'suppliers', 'products'));
+        return view('admin.purchases.edit', compact('purchase', 'suppliers', 'products', 'productVariants'));
     }
 
     public function update(Request $request, Purchase $purchase)
@@ -184,6 +188,7 @@ class PurchaseController extends Controller
             'notes' => 'nullable|string',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
+            'items.*.product_variant_id' => 'nullable|exists:product_variants,id',
             'items.*.quantity' => 'required|numeric|min:0.01',
             'items.*.unit_price' => 'required|numeric|min:0',
             'items.*.discount' => 'nullable|numeric|min:0',
@@ -204,6 +209,7 @@ class PurchaseController extends Controller
                     $subTotal += $totalPrice;
                     $itemsData[] = [
                         'product_id' => $item['product_id'],
+                        'product_variant_id' => $item['product_variant_id'] ?? null,
                         'quantity' => $item['quantity'],
                         'unit_price' => $item['unit_price'],
                         'discount' => $item['discount'] ?? 0,
@@ -291,5 +297,25 @@ class PurchaseController extends Controller
         }
 
         return back()->with('success', 'Payment added successfully!');
+    }
+
+    /**
+     * {product_id: [{id, label, purchase_price, current_stock}, ...]} for
+     * the purchase form's variant picker - keyed by product id since the
+     * product <select> here is plain server-rendered <option>s (not a JS
+     * product array like the Sale form), so the variant dropdown looks
+     * itself up by whichever product_id was just chosen.
+     */
+    private function productVariantsForJs($products)
+    {
+        return $products->filter(fn ($p) => $p->has_variants)
+            ->mapWithKeys(fn ($p) => [
+                $p->id => $p->activeVariants->map(fn ($v) => [
+                    'id' => $v->id,
+                    'label' => $v->label,
+                    'purchase_price' => (float) $v->purchase_price,
+                    'current_stock' => (float) $v->current_stock,
+                ])->values(),
+            ]);
     }
 }

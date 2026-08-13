@@ -52,18 +52,7 @@ class LoginRequest extends FormRequest
 
         $user = Auth::user();
 
-        if ($user->isSalesAgent() && ! $user->isActive()) {
-            Auth::logout();
-            RateLimiter::hit($this->throttleKey());
-
-            throw ValidationException::withMessages([
-                'email' => is_null($user->approved_at)
-                    ? 'Your agent application is still pending admin approval.'
-                    : 'Your account has been deactivated. Please contact the admin.',
-            ]);
-        }
-
-        if (! $user->isSalesAgent() && ! $user->is_active) {
+        if (! $user->is_active) {
             Auth::logout();
             RateLimiter::hit($this->throttleKey());
 

@@ -66,7 +66,6 @@ class LogActivity
             'sales' => 'sale',
             'expenses' => 'expense',
             'incomes' => 'income',
-            'agents' => 'agent',
             'inventory' => 'inventory',
             'reports' => 'report',
             'backups' => 'backup',

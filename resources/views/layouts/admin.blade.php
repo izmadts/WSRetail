@@ -104,6 +104,12 @@
                         </div>
                     @endif
                     <span class="ml-2 text-xl font-bold text-gray-800">{{ $siteName }}</span>
+                    @if($demoMode ?? false)
+                    <button type="button" @click="$store.wserpUi.demoIntroOpen = true" title="Learn about this software"
+                        class="ml-2 w-6 h-6 flex-shrink-0 flex items-center justify-center rounded-full bg-amber-100 text-amber-700 text-xs font-bold hover:bg-amber-200 transition-colors duration-150">
+                        ?
+                    </button>
+                    @endif
                 </div>
                 <button @click="sidebarOpen = false" class="lg:hidden text-gray-500 hover:text-gray-700">
                     <i class="fas fa-times"></i>
@@ -129,6 +135,7 @@
                             'links' => [
                                 ['route' => 'admin.products.index', 'is' => 'admin.products.*', 'icon' => 'fa-box', 'label' => 'Products', 'module' => 'products'],
                                 ['route' => 'admin.categories.index', 'is' => 'admin.categories.*', 'icon' => 'fa-tags', 'label' => 'Categories', 'module' => 'categories'],
+                                ['route' => 'admin.product-attributes.index', 'is' => 'admin.product-attributes.*', 'icon' => 'fa-palette', 'label' => 'Attributes (Size/Color)', 'module' => 'products'],
                                 ['route' => 'admin.inventory.dashboard', 'is' => 'admin.inventory.dashboard', 'icon' => 'fa-warehouse', 'label' => 'Inventory', 'module' => 'inventory'],
                                 ['route' => 'admin.inventory.adjustments.index', 'is' => 'admin.inventory.adjustments.*', 'icon' => 'fa-sliders-h', 'label' => 'Stock Adjustments', 'module' => 'inventory'],
                                 ['route' => 'admin.inventory.history', 'is' => 'admin.inventory.history', 'icon' => 'fa-history', 'label' => 'Stock History', 'module' => 'inventory'],
@@ -151,14 +158,6 @@
                                 ['route' => 'admin.customers.index', 'is' => 'admin.customers.*', 'icon' => 'fa-users', 'label' => 'Customers', 'module' => 'customers'],
                                 ['route' => 'admin.sales.index', 'is' => 'admin.sales.*', 'icon' => 'fa-shopping-bag', 'label' => 'Sales', 'module' => 'sales'],
                                 ['route' => 'admin.sales-returns.index', 'is' => 'admin.sales-returns.*', 'icon' => 'fa-undo-alt', 'label' => 'Sales Returns', 'module' => 'sales-returns'],
-                            ],
-                        ],
-                        [
-                            'key' => 'agents', 'label' => 'Agents', 'icon' => 'fa-user-tie', 'color' => 'text-teal-500',
-                            'active' => request()->routeIs('admin.agents.*'),
-                            'links' => [
-                                ['route' => 'admin.agents.index', 'is' => 'admin.agents.*', 'icon' => 'fa-user-tie', 'label' => 'Agents', 'badge' => $pendingAgents = App\Models\User::where('role', 'sales_agent')->where('is_active', false)->whereNull('approved_at')->count(), 'badgeColor' => 'bg-yellow-500', 'module' => 'agents'],
-                                ['route' => 'admin.agents.pending', 'is' => 'admin.agents.pending', 'icon' => 'fa-clock', 'label' => 'Pending Approvals', 'badge' => $pendingAgents, 'badgeColor' => 'bg-yellow-500', 'module' => 'agents'],
                             ],
                         ],
                         [
@@ -207,7 +206,6 @@
                                 ['route' => 'admin.reports.day-book', 'is' => 'admin.reports.day-book', 'icon' => 'fa-book', 'label' => 'Day Book', 'module' => 'reports'],
                                 ['route' => 'admin.reports.expenses', 'is' => 'admin.reports.expenses', 'icon' => 'fa-arrow-down', 'label' => 'Expenses', 'iconColor' => 'text-red-500', 'module' => 'reports'],
                                 ['route' => 'admin.reports.incomes', 'is' => 'admin.reports.incomes', 'icon' => 'fa-arrow-up', 'label' => 'Income', 'iconColor' => 'text-green-500', 'module' => 'reports'],
-                                ['route' => 'admin.reports.agents', 'is' => 'admin.reports.agents', 'icon' => 'fa-user-tie', 'label' => 'Agents', 'module' => 'reports'],
                                 ['route' => 'admin.reports.daily-summary', 'is' => 'admin.reports.daily-summary', 'icon' => 'fa-calendar-day', 'label' => 'Daily Summary', 'module' => 'reports'],
                                 ['route' => 'admin.reports.tax', 'is' => 'admin.reports.tax', 'icon' => 'fa-percentage', 'label' => 'Tax Report', 'module' => 'reports'],
                             ],
@@ -235,9 +233,12 @@
                             'links' => [
                                 ['route' => 'admin.settings.general', 'is' => 'admin.settings.general', 'icon' => 'fa-sliders-h', 'label' => 'General'],
                                 ['route' => 'admin.settings.customer-groups.index', 'is' => 'admin.settings.customer-groups.*', 'icon' => 'fa-layer-group', 'label' => 'Customer Groups'],
+                                ['route' => 'admin.settings.locations.index', 'is' => 'admin.settings.locations.*', 'icon' => 'fa-store', 'label' => 'Locations'],
+                                ['route' => 'admin.settings.pos.edit', 'is' => 'admin.settings.pos.*', 'icon' => 'fa-cash-register', 'label' => 'POS Settings'],
                                 ['route' => 'admin.settings.users.index', 'is' => 'admin.settings.users.*', 'icon' => 'fa-users-cog', 'label' => 'Users'],
                                 ['route' => 'admin.settings.permissions.index', 'is' => 'admin.settings.permissions.*', 'icon' => 'fa-shield-alt', 'label' => 'Permissions'],
-                                ['route' => 'admin.settings.commission', 'is' => 'admin.settings.commission', 'icon' => 'fa-percentage', 'label' => 'Commission & Bonus'],
+                                ['route' => 'admin.settings.credit', 'is' => 'admin.settings.credit', 'icon' => 'fa-credit-card', 'label' => 'Credit Settings'],
+                                ['route' => 'admin.license.index', 'is' => 'admin.license.index', 'icon' => 'fa-key', 'label' => 'License'],
                             ],
                         ];
                     }
@@ -310,6 +311,17 @@
                         <i class="fas fa-search"></i>
                     </button>
 
+                    <!-- POS - opens in its own tab, its own dedicated URL and
+                         minimal full-screen layout (layouts.pos), not nested
+                         inside this admin chrome. -->
+                    @if(auth()->user() && auth()->user()->hasPermission('sales', 'create'))
+                    <a href="{{ route('admin.sales.pos') }}" title="Point of Sale" target="_blank" rel="noopener"
+                        class="flex items-center gap-1.5 h-9 px-3 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors duration-150">
+                        <i class="fas fa-cash-register"></i>
+                        <span class="hidden sm:inline">POS</span>
+                    </a>
+                    @endif
+
                     @php
                         $quickAddItems = array_values(array_filter([
                             ['route' => 'admin.sales.create', 'icon' => 'fa-shopping-bag', 'color' => 'text-emerald-600', 'label' => 'New Sale', 'module' => 'sales'],
@@ -349,12 +361,6 @@
                                 'count' => App\Models\Product::lowStock()->count(),
                                 'route' => 'admin.products.low-stock',
                                 'text' => 'product(s) at or below their minimum stock level',
-                            ] : null,
-                            (auth()->user() && auth()->user()->hasPermission('agents', 'view')) ? [
-                                'label' => 'Pending Agents', 'icon' => 'fa-user-clock', 'color' => 'text-yellow-500',
-                                'count' => App\Models\User::where('role', 'sales_agent')->where('is_active', false)->whereNull('approved_at')->count(),
-                                'route' => 'admin.agents.pending',
-                                'text' => 'sales agent registration(s) awaiting approval',
                             ] : null,
                             (auth()->user() && auth()->user()->hasPermission('leaves', 'view')) ? [
                                 'label' => 'Pending Leave', 'icon' => 'fa-calendar-check', 'color' => 'text-indigo-500',
@@ -413,6 +419,17 @@
                         class="w-9 h-9 flex items-center justify-center rounded-lg text-red-500 hover:text-red-700 hover:bg-red-50">
                         <i class="fas fa-heartbeat"></i>
                     </a>
+
+                    <!-- Buy This Software -->
+                    <button type="button" @click="$store.wserpUi.buyOpen = true" title="Buy this software"
+                        class="hidden sm:flex items-center gap-1.5 h-9 px-3 rounded-lg bg-amber-500 text-white text-sm font-medium hover:bg-amber-600 transition-colors duration-150">
+                        <i class="fas fa-tag"></i>
+                        <span>Buy This Software</span>
+                    </button>
+                    <button type="button" @click="$store.wserpUi.buyOpen = true" title="Buy this software"
+                        class="sm:hidden w-9 h-9 flex items-center justify-center rounded-lg bg-amber-500 text-white hover:bg-amber-600">
+                        <i class="fas fa-tag"></i>
+                    </button>
                     @endif
 
                     <!-- Keyboard shortcuts help -->
@@ -589,6 +606,105 @@
                 </div>
             </div>
 
+            <!-- ========================================== -->
+            <!-- BUY THIS SOFTWARE -->
+            <!-- ========================================== -->
+            @if(auth()->user() && auth()->user()->isAdmin())
+            <div x-show="$store.wserpUi.buyOpen" x-cloak
+                @keydown.escape.window="$store.wserpUi.buyOpen = false"
+                class="fixed inset-0 z-[60] overflow-y-auto" style="display: none;">
+                <div class="fixed inset-0 bg-[rgba(0,0,0,.5)]" @click="$store.wserpUi.buyOpen = false"></div>
+                <div class="flex items-start sm:items-center justify-center min-h-screen px-4 py-8">
+                    <div class="relative bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold text-gray-900"><i class="fas fa-tag text-amber-500 mr-2"></i> Buy This Software</h3>
+                            <button @click="$store.wserpUi.buyOpen = false" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+                        </div>
+                        <div class="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
+                            @include('admin.license._purchase-form')
+                        </div>
+                    </div>
+                </div>
+            </div>
+            @endif
+
+            <!-- ========================================== -->
+            <!-- DEMO INTRO / MARKETING PITCH (Urdu) -->
+            <!-- Demo Mode only - see Settings > General. Auto-opens once -->
+            <!-- right after login (demoIntroOpen seeded from the -->
+            <!-- show_demo_intro flash flag above); reopen anytime via the -->
+            <!-- "?" button next to the logo. -->
+            <!-- ========================================== -->
+            @if($demoMode ?? false)
+            <div x-show="$store.wserpUi.demoIntroOpen" x-cloak
+                @keydown.escape.window="$store.wserpUi.demoIntroOpen = false"
+                class="fixed inset-0 z-[70] overflow-y-auto" style="display: none;">
+                <div class="fixed inset-0 bg-[rgba(0,0,0,.6)]" @click="$store.wserpUi.demoIntroOpen = false"></div>
+                <div class="flex items-start sm:items-center justify-center min-h-screen px-4 py-8">
+                    <div class="relative bg-white rounded-2xl shadow-2xl max-w-xl w-full overflow-hidden" dir="rtl" lang="ur">
+                        <div class="bg-gradient-to-l from-amber-500 to-orange-500 px-6 py-5 text-white relative">
+                            <button @click="$store.wserpUi.demoIntroOpen = false" class="absolute left-4 top-4 text-white/80 hover:text-white">
+                                <i class="fas fa-times"></i>
+                            </button>
+                            <h3 class="text-2xl font-bold" style="font-family: 'Jameel Noori Nastaleeq','Noto Nastaliq Urdu','Segoe UI',sans-serif;">
+                                WSRetail میں خوش آمدید! 👋
+                            </h3>
+                            <p class="mt-1 text-white/90 text-sm">
+                                یہ ایک مکمل پوائنٹ آف سیل اور بزنس مینجمنٹ سافٹ ویئر ہے - آئیے مختصراً جان لیتے ہیں۔
+                            </p>
+                        </div>
+
+                        <div class="p-6 space-y-5 max-h-[65vh] overflow-y-auto">
+                            <div>
+                                <p class="text-sm font-semibold text-gray-800 mb-2">📌 یہ سافٹ ویئر کن کاروبار کے لیے بہترین ہے؟</p>
+                                <div class="grid grid-cols-2 gap-2 text-sm">
+                                    <div class="flex items-center gap-2 bg-amber-50 rounded-lg px-3 py-2">
+                                        <span class="text-lg">🍽️</span><span class="text-gray-700">ریسٹورنٹ / کیفے</span>
+                                    </div>
+                                    <div class="flex items-center gap-2 bg-amber-50 rounded-lg px-3 py-2">
+                                        <span class="text-lg">👗</span><span class="text-gray-700">کپڑوں کی دکان</span>
+                                    </div>
+                                    <div class="flex items-center gap-2 bg-amber-50 rounded-lg px-3 py-2">
+                                        <span class="text-lg">📱</span><span class="text-gray-700">موبائل شاپ</span>
+                                    </div>
+                                    <div class="flex items-center gap-2 bg-amber-50 rounded-lg px-3 py-2">
+                                        <span class="text-lg">🛒</span><span class="text-gray-700">جنرل / ریٹیل اسٹور</span>
+                                    </div>
+                                    <div class="flex items-center gap-2 bg-amber-50 rounded-lg px-3 py-2 col-span-2">
+                                        <span class="text-lg">📦</span><span class="text-gray-700">ہول سیل اور کوئی بھی چھوٹا بڑا کاروبار</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <p class="text-sm font-semibold text-gray-800 mb-2">✨ اہم خصوصیات</p>
+                                <ul class="space-y-1.5 text-sm text-gray-600">
+                                    <li class="flex items-center gap-2"><i class="fas fa-cash-register text-blue-500 w-5"></i> فُل اسکرین POS (بلنگ کاؤنٹر)</li>
+                                    <li class="flex items-center gap-2"><i class="fas fa-boxes text-purple-500 w-5"></i> انوینٹری، سائز/رنگ ویری اینٹس، بارکوڈ</li>
+                                    <li class="flex items-center gap-2"><i class="fas fa-calculator text-emerald-500 w-5"></i> مکمل اکاؤنٹنگ اور منافع/نقصان رپورٹس</li>
+                                    <li class="flex items-center gap-2"><i class="fas fa-store text-orange-500 w-5"></i> اپنا آن لائن اسٹور (کسٹمر ایپ سے جڑا ہوا)</li>
+                                    <li class="flex items-center gap-2"><i class="fas fa-users text-pink-500 w-5"></i> ملازمین، صارفین اور سپلائرز کا مکمل ریکارڈ</li>
+                                </ul>
+                            </div>
+
+                            <p class="text-xs text-gray-400 text-center pt-1">
+                                یہ صرف ڈیمو ہے - بلا جھجک ہر فیچر آزما کر دیکھیں۔ دوبارہ یہ معلومات دیکھنے کے لیے لوگو کے ساتھ موجود
+                                <span class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-100 text-amber-700 text-[10px] font-bold align-middle">?</span>
+                                آئیکن پر کلک کریں۔
+                            </p>
+                        </div>
+
+                        <div class="px-6 pb-6">
+                            <button @click="$store.wserpUi.demoIntroOpen = false"
+                                class="w-full py-2.5 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800">
+                                ٹھیک ہے، ڈیمو شروع کریں
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            @endif
+
             <!-- Page Content -->
             <main class="p-4 lg:p-6">
                 @if(session('success'))
@@ -644,7 +760,12 @@
         const wserpShortcutMap = @json($shortcutMap ?? []);
 
         document.addEventListener('alpine:init', () => {
-            Alpine.store('wserpUi', { searchOpen: false, shortcutsOpen: false });
+            Alpine.store('wserpUi', {
+                searchOpen: false,
+                shortcutsOpen: false,
+                buyOpen: false,
+                demoIntroOpen: @json((bool) session('show_demo_intro')),
+            });
         });
 
         document.addEventListener('DOMContentLoaded', function () {
@@ -667,7 +788,7 @@
                 }
 
                 const ui = Alpine.store('wserpUi');
-                const modalOpen = ui.searchOpen || ui.shortcutsOpen;
+                const modalOpen = ui.searchOpen || ui.shortcutsOpen || ui.buyOpen || ui.demoIntroOpen;
 
                 // Never hijack typing, an open modal, or any other modifier combo.
                 if (isTyping(e.target) || modalOpen || e.ctrlKey || e.metaKey || e.altKey) {

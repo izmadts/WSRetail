@@ -13,10 +13,9 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
- * The Payroll equivalent of CommissionService - accrual (Run Payroll)
- * posts Dr Salary Expense / Cr Salary Payable, payment posts the reverse
- * against Cash/Bank. Deliberately simplified vs the commission engine:
- * no multi-log FIFO payment allocation, since a payslip is one discrete
+ * Payroll accrual (Run Payroll) posts Dr Salary Expense / Cr Salary
+ * Payable, payment posts the reverse against Cash/Bank. Deliberately no
+ * multi-log FIFO payment allocation, since a payslip is one discrete
  * monthly obligation, not a running tab (see SalaryPayment). Deductions
  * (tax/other) are netted straight out of the expense/payable pair rather
  * than routed to a separate liability - there's no tax-authority-remittance

@@ -6,11 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Models\Sale;
 use App\Models\SaleItem;
 use App\Models\Customer;
-use App\Models\User;
 use App\Models\Product;
+use App\Models\Location;
 use App\Models\Expense;
 use App\Services\SaleService;
-use App\Services\CommissionService;
+use App\Services\CustomerCreditService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
@@ -18,17 +18,23 @@ use Illuminate\Support\Facades\Auth;
 class SaleController extends Controller
 {
     protected $saleService;
-    protected $commissionService;
+    protected $creditService;
 
-    public function __construct(SaleService $saleService, CommissionService $commissionService)
+    public function __construct(SaleService $saleService, CustomerCreditService $creditService)
     {
         $this->saleService = $saleService;
-        $this->commissionService = $commissionService;
+        $this->creditService = $creditService;
     }
 
     public function index()
     {
-        $sales = Sale::with('customer', 'agent', 'createdBy')
+        // A POS Manager has no reason to browse the full sales list - keep
+        // them on the one screen they're meant to live in.
+        if (Auth::user()->isPosManager()) {
+            return redirect()->route('admin.sales.pos');
+        }
+
+        $sales = Sale::with('customer', 'createdBy')
             ->orderBy('created_at', 'desc')
             ->get();
         return view('admin.sales.index', compact('sales'));
@@ -36,27 +42,27 @@ class SaleController extends Controller
 
     public function create()
     {
+        if (Auth::user()->isPosManager()) {
+            return redirect()->route('admin.sales.pos');
+        }
+
         $customers = Customer::active()->with('customerGroup')->orderBy('name')->get();
-        $agents = User::where('role', 'sales_agent')
-            ->where('is_active', true)
-            ->whereNotNull('approved_at')
-            ->orderBy('name')
-            ->get(['id', 'name']);
-        $products = Product::active()->where('current_stock', '>', 0)->orderBy('name')->get();
-        $commissionPreview = $this->commissionPreviewData($agents);
+        $products = Product::active()->inStock()->with('activeVariants.attributeValues')->orderBy('name')->get();
+        $locations = Location::active()->orderBy('name')->get();
         $productsForJs = $this->productsForJs($products);
-        return view('admin.sales.create', compact('customers', 'agents', 'products', 'commissionPreview', 'productsForJs'));
+        return view('admin.sales.create', compact('customers', 'products', 'locations', 'productsForJs'));
     }
 
     public function store(Request $request)
     {
         $validated = $request->validate([
             'customer_id' => 'required|exists:customers,id',
-            'agent_id' => 'nullable|exists:users,id',
+            'location_id' => 'nullable|exists:locations,id',
             'sale_date' => 'required|date',
             'payment_term' => 'required|in:cash,credit',
             'status' => 'required|in:draft,confirmed',
             'amount_received' => 'nullable|numeric|min:0',
+            'payment_method' => 'nullable|in:cash,bank_transfer,cheque,credit_card',
             'sub_total' => 'required|numeric|min:0',
             'discount' => 'nullable|numeric|min:0',
             'discount_type' => 'nullable|in:fixed,percentage',
@@ -65,14 +71,23 @@ class SaleController extends Controller
             'notes' => 'nullable|string',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
+            'items.*.product_variant_id' => 'nullable|exists:product_variants,id',
             'items.*.quantity' => 'required|numeric|min:0.01',
             'items.*.unit_price' => 'required|numeric|min:0',
             'items.*.discount' => 'nullable|numeric|min:0',
             'items.*.tax' => 'nullable|numeric|min:0',
         ]);
 
+        // A user locked to one location (typically a POS Manager) can never
+        // sell as another location, no matter what the submitted form said -
+        // the hidden/hidden-away field on the client is a convenience, not
+        // the actual gate.
+        if (Auth::user()->location_id) {
+            $validated['location_id'] = Auth::user()->location_id;
+        }
+
         try {
-            $this->storeSale($validated);
+            $sale = $this->storeSale($validated);
         } catch (\Illuminate\Validation\ValidationException $e) {
             throw $e;
         } catch (\Exception $e) {
@@ -84,13 +99,21 @@ class SaleController extends Controller
             return back()->with('error', $e->getMessage())->withInput();
         }
 
+        // The POS screen sends this so a checkout lands on the printable
+        // receipt instead of the admin sales list - a POS Manager can't
+        // even reach that list (see index()/create() above).
+        if ($request->input('redirect_to') === 'receipt') {
+            return redirect()->route('admin.sales.receipt', $sale)
+                ->with('success', 'Sale completed!');
+        }
+
         return redirect()->route('admin.sales.index')
             ->with('success', 'Sale created successfully! Stock and accounting updated.');
     }
 
     private function storeSale(array $validated)
     {
-        DB::transaction(function () use ($validated) {
+        return DB::transaction(function () use ($validated) {
             $customer = Customer::find($validated['customer_id']);
             $subTotal = 0;
             $itemsData = [];
@@ -104,6 +127,7 @@ class SaleController extends Controller
                 $subTotal += $totalPrice;
                 $itemsData[] = [
                     'product_id' => $item['product_id'],
+                    'product_variant_id' => $item['product_variant_id'] ?? null,
                     'quantity' => $item['quantity'],
                     'unit_price' => $item['unit_price'],
                     'discount' => $item['discount'] ?? 0,
@@ -147,10 +171,10 @@ class SaleController extends Controller
             $status = $amountReceived > 0 ? 'confirmed' : $validated['status'];
 
             // Credit-hold / credit-limit gate - both off by default, admin
-            // opt-in via Settings > Commission & Bonus. A draft sale hasn't
-            // posted a receivable yet, so it's not gated here.
+            // opt-in via Settings > Credit. A draft sale hasn't posted a
+            // receivable yet, so it's not gated here.
             if ($status !== 'draft' && $validated['payment_term'] === 'credit') {
-                $blockMessage = $this->commissionService->creditGateMessage($customer, $totalAmount);
+                $blockMessage = $this->creditService->creditGateMessage($customer, $totalAmount);
                 if ($blockMessage) {
                     throw \Illuminate\Validation\ValidationException::withMessages([
                         'customer_id' => $blockMessage,
@@ -158,12 +182,9 @@ class SaleController extends Controller
                 }
             }
 
-            // Commission is calculated by CommissionService below (settings-
-            // driven progressive tiers for cash, per-payment accrual for
-            // credit) - not a flat agent rate stored as a lump amount here.
             $sale = Sale::create([
                 'customer_id' => $validated['customer_id'],
-                'agent_id' => $validated['agent_id'] ?? null,
+                'location_id' => $validated['location_id'] ?? null,
                 'sale_date' => $validated['sale_date'],
                 'payment_term' => $validated['payment_term'],
                 'status' => $status,
@@ -173,7 +194,6 @@ class SaleController extends Controller
                 'tax' => $validated['tax'] ?? 0,
                 'shipping_cost' => $validated['shipping_cost'] ?? 0,
                 'total_amount' => $totalAmount,
-                'commission_amount' => 0,
                 'paid_amount' => 0,
                 'due_amount' => $totalAmount,
                 'notes' => $validated['notes'] ?? null,
@@ -186,7 +206,6 @@ class SaleController extends Controller
 
             // Once per sale, not once per line item.
             $customer->incrementOrderCount();
-            $this->commissionService->awardNewCustomerBonus($customer, $sale);
 
             $this->saleService->applyStockAndAccounting($sale);
 
@@ -197,8 +216,10 @@ class SaleController extends Controller
                 // (instead of creating the row already status='paid') keeps
                 // the payment trail/accounting consistent for a
                 // pay-in-full-at-checkout sale.
-                $this->saleService->recordPayment($sale, $amountReceived, 'cash', $validated['sale_date']);
+                $this->saleService->recordPayment($sale, $amountReceived, $validated['payment_method'] ?? 'cash', $validated['sale_date']);
             }
+
+            return $sale;
         });
     }
 
@@ -207,8 +228,22 @@ class SaleController extends Controller
      */
     public function show(Sale $sale)
     {
-        $sale->load('customer', 'agent', 'items.product', 'payments', 'createdBy');
+        $sale->load('customer', 'location', 'items.product', 'payments', 'createdBy');
         return view('admin.sales.show', compact('sale'));
+    }
+
+    /**
+     * Standalone printable receipt - its own bare HTML document (no admin
+     * chrome), sized per Settings > POS Settings' paper size, and the
+     * landing page the POS checkout redirects to. Reachable for any sale
+     * (not POS-only) since a regular admin sale can be reprinted the same
+     * way.
+     */
+    public function receipt(Sale $sale)
+    {
+        $sale->load('customer', 'location', 'items.product', 'payments', 'createdBy');
+        $posSettings = \App\Models\PosSetting::current();
+        return view('admin.sales.receipt', compact('sale', 'posSettings'));
     }
 
     public function edit(Sale $sale)
@@ -218,12 +253,14 @@ class SaleController extends Controller
         }
 
         $customers = Customer::active()->with('customerGroup')->orderBy('name')->get();
-        $agents = User::where('role', 'sales_agent')
-            ->where('is_active', true)
-            ->whereNotNull('approved_at')
+        // Union "currently active" locations with the sale's own location
+        // (if any) so an edit doesn't blank out a location that's since been
+        // deactivated.
+        $locations = Location::where('is_active', true)
+            ->orWhere('id', $sale->location_id)
             ->orderBy('name')
-            ->get(['id', 'name']);
-        $sale->load('items', 'customer.customerGroup');
+            ->get();
+        $sale->load('items', 'customer.customerGroup', 'location');
 
         // Union "currently sellable" products with whatever this sale's
         // existing items already reference, so an item on a product that's
@@ -231,49 +268,15 @@ class SaleController extends Controller
         // the edit form silently blanking its selection.
         $existingProductIds = $sale->items->pluck('product_id');
         $products = Product::where(function ($q) {
-                $q->where('is_active', true)->where('current_stock', '>', 0);
+                $q->where('is_active', true)->inStock();
             })
             ->orWhereIn('id', $existingProductIds)
+            ->with('activeVariants.attributeValues')
             ->orderBy('name')
             ->get();
 
-        $commissionPreview = $this->commissionPreviewData($agents, $sale->id);
         $productsForJs = $this->productsForJs($products);
-        return view('admin.sales.edit', compact('sale', 'customers', 'agents', 'products', 'commissionPreview', 'productsForJs'));
-    }
-
-    /**
-     * Cash-tier table, credit rate, and each agent's month-to-date confirmed
-     * cash sales - everything the create/edit form's JS needs to preview the
-     * real settings-driven commission (CommissionService::calculateCashCommission)
-     * instead of a flat rate that hasn't matched the actual engine since the
-     * Phase 3 rebuild. $excludeSaleId keeps an in-progress edit from double
-     * counting the sale's own prior amount into its own bracket.
-     */
-    private function commissionPreviewData($agents, $excludeSaleId = null)
-    {
-        $now = now();
-        $mtdByAgent = [];
-
-        foreach ($agents as $agent) {
-            $query = Sale::where('agent_id', $agent->id)
-                ->where('payment_term', 'cash')
-                ->whereIn('status', ['confirmed', 'partial', 'paid'])
-                ->whereMonth('sale_date', $now->month)
-                ->whereYear('sale_date', $now->year);
-
-            if ($excludeSaleId) {
-                $query->where('id', '!=', $excludeSaleId);
-            }
-
-            $mtdByAgent[$agent->id] = (float) $query->sum('total_amount');
-        }
-
-        return [
-            'cash_tiers' => CommissionService::getSetting('commission.cash_tiers'),
-            'credit_rate' => (float) CommissionService::getSetting('commission.credit_rate'),
-            'agent_mtd_cash' => $mtdByAgent,
-        ];
+        return view('admin.sales.edit', compact('sale', 'customers', 'products', 'locations', 'productsForJs'));
     }
 
     /**
@@ -294,7 +297,52 @@ class SaleController extends Controller
             'current_stock' => (float) $p->current_stock,
             'is_retail' => (bool) $p->is_retail,
             'is_wholesale' => (bool) $p->is_wholesale,
+            'category_id' => $p->category_id,
+            'image' => $p->image ? asset($p->image) : null,
+            'has_variants' => (bool) $p->has_variants,
+            'variants' => $p->relationLoaded('activeVariants')
+                ? $p->activeVariants->map(fn ($v) => [
+                    'id' => $v->id,
+                    'label' => $v->label,
+                    'sale_price' => (float) $v->sale_price,
+                    'wholesale_price' => (float) $v->wholesale_price,
+                    'purchase_price' => (float) $v->purchase_price,
+                    'current_stock' => (float) $v->current_stock,
+                ])->values()
+                : [],
         ])->values();
+    }
+
+    /**
+     * The cashier-style checkout screen (topbar "POS" button) - click-to-add
+     * product grid + cart, instead of create()'s manual line-item rows. It
+     * still submits to store() below, so every rule that applies to a normal
+     * sale (credit gate, stock/accounting) applies here too -
+     * this is just a faster front end onto the same endpoint, not a
+     * parallel sale-creation path.
+     */
+    public function pos()
+    {
+        $customers = Customer::active()->with('customerGroup')->orderBy('name')->get();
+        $products = Product::active()->inStock()->with('activeVariants.attributeValues')->orderBy('name')->get();
+        $categories = \App\Models\Category::active()
+            ->whereIn('id', $products->pluck('category_id')->unique())
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        // A user locked to one location (typically a POS Manager) never
+        // sees a switcher - just their one location, fixed. Everyone else
+        // (admin/manager) gets the full active list, same as before.
+        $lockedLocation = Auth::user()->location_id ? Location::find(Auth::user()->location_id) : null;
+        $locations = $lockedLocation ? collect([$lockedLocation]) : Location::active()->orderBy('name')->get();
+
+        $productsForJs = $this->productsForJs($products);
+        $posSettings = \App\Models\PosSetting::current();
+
+        return view('admin.sales.pos', compact(
+            'customers', 'categories', 'locations', 'lockedLocation',
+            'productsForJs', 'posSettings'
+        ));
     }
 
     public function update(Request $request, Sale $sale)
@@ -305,7 +353,7 @@ class SaleController extends Controller
 
         $validated = $request->validate([
             'customer_id' => 'required|exists:customers,id',
-            'agent_id' => 'nullable|exists:users,id',
+            'location_id' => 'nullable|exists:locations,id',
             'sale_date' => 'required|date',
             'payment_term' => 'required|in:cash,credit',
             // 'partial'/'paid' deliberately excluded - those are derived
@@ -320,6 +368,7 @@ class SaleController extends Controller
             'notes' => 'nullable|string',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
+            'items.*.product_variant_id' => 'nullable|exists:product_variants,id',
             'items.*.quantity' => 'required|numeric|min:0.01',
             'items.*.unit_price' => 'required|numeric|min:0',
             'items.*.discount' => 'nullable|numeric|min:0',
@@ -347,6 +396,7 @@ class SaleController extends Controller
 
                     $itemsData[] = [
                         'product_id' => $item['product_id'],
+                        'product_variant_id' => $item['product_variant_id'] ?? null,
                         'quantity' => $item['quantity'],
                         'unit_price' => $item['unit_price'],
                         'discount' => $item['discount'] ?? 0,
@@ -357,7 +407,7 @@ class SaleController extends Controller
 
                 $sale->update([
                     'customer_id' => $validated['customer_id'],
-                    'agent_id' => $validated['agent_id'] ?? null,
+                    'location_id' => $validated['location_id'] ?? null,
                     'sale_date' => $validated['sale_date'],
                     'payment_term' => $validated['payment_term'],
                     'status' => $validated['status'],
@@ -408,9 +458,8 @@ class SaleController extends Controller
      * Commits a still-draft sale - flips it to confirmed and runs
      * SaleService::applyStockAndAccounting (a draft sale has no stock/ledger
      * effect yet, see the status gate at the top of that method). Primarily
-     * for customer-placed orders with no agent (source=customer_app,
-     * agent_id null - "direct" orders per the customer API), which only an
-     * admin can act on since no agent owns them, but works for any draft.
+     * for customer-placed orders (source=customer_app), which only an admin
+     * can confirm/reject, but works for any draft.
      */
     public function confirm(Sale $sale)
     {

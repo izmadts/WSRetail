@@ -8,6 +8,14 @@
             class="px-4 py-2.5 text-sm font-medium border-b-2 transition-colors duration-150 {{ request()->routeIs('admin.settings.customer-groups.*') ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700' }}">
             <i class="fas fa-layer-group mr-1"></i> Customer Groups
         </a>
+        <a href="{{ route('admin.settings.locations.index') }}"
+            class="px-4 py-2.5 text-sm font-medium border-b-2 transition-colors duration-150 {{ request()->routeIs('admin.settings.locations.*') ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700' }}">
+            <i class="fas fa-store mr-1"></i> Locations
+        </a>
+        <a href="{{ route('admin.settings.pos.edit') }}"
+            class="px-4 py-2.5 text-sm font-medium border-b-2 transition-colors duration-150 {{ request()->routeIs('admin.settings.pos.*') ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700' }}">
+            <i class="fas fa-cash-register mr-1"></i> POS Settings
+        </a>
         <a href="{{ route('admin.settings.users.index') }}"
             class="px-4 py-2.5 text-sm font-medium border-b-2 transition-colors duration-150 {{ request()->routeIs('admin.settings.users.*') ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700' }}">
             <i class="fas fa-users-cog mr-1"></i> Users
@@ -16,9 +24,9 @@
             class="px-4 py-2.5 text-sm font-medium border-b-2 transition-colors duration-150 {{ request()->routeIs('admin.settings.permissions.*') ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700' }}">
             <i class="fas fa-shield-alt mr-1"></i> Permissions
         </a>
-        <a href="{{ route('admin.settings.commission') }}"
-            class="px-4 py-2.5 text-sm font-medium border-b-2 transition-colors duration-150 {{ request()->routeIs('admin.settings.commission') ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700' }}">
-            <i class="fas fa-percentage mr-1"></i> Commission &amp; Bonus
+        <a href="{{ route('admin.settings.credit') }}"
+            class="px-4 py-2.5 text-sm font-medium border-b-2 transition-colors duration-150 {{ request()->routeIs('admin.settings.credit') ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700' }}">
+            <i class="fas fa-credit-card mr-1"></i> Credit Settings
         </a>
     </nav>
 </div>

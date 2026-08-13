@@ -5,11 +5,7 @@ namespace App\Http\Resources\Api\Customer;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * The customer's own view of themselves - richer than Api\Agent's
- * CustomerResource (which is what an AGENT needs to see about a customer
- * they manage), since this also carries the pricing channel "so the
- * customer can see their own details", per the original request this
- * API was built for.
+ * The customer's own view of themselves.
  */
 class CustomerProfileResource extends JsonResource
 {
@@ -34,26 +30,18 @@ class CustomerProfileResource extends JsonResource
             'is_active' => (bool) $this->is_active,
             'order_count' => (int) $this->order_count,
 
-            // The linked sales agent is purely relationship/commission
-            // attribution - it does NOT decide pricing.
-            'agent' => $this->whenLoaded('createdByAgent', fn () => $this->createdByAgent ? [
-                'id' => $this->createdByAgent->id,
-                'name' => $this->createdByAgent->name,
-                'phone' => $this->createdByAgent->phone,
-            ] : null),
-
             // customer_group is informational only here (still useful for
-            // reporting/reconciliation elsewhere in WSERP) - it does NOT
-            // drive Mandi pricing. This whole API is a wholesale-only
+            // reporting/reconciliation elsewhere in WSRetail) - it does NOT
+            // drive storefront pricing. This whole API is a retail-only
             // channel, unconditionally - see the note on
             // Api\Customer\OrderController::resolveChannel(). order_channel
-            // is therefore always "wholesale", not derived from the group.
+            // is therefore always "retail", not derived from the group.
             'customer_group' => $this->whenLoaded('customerGroup', fn () => $this->customerGroup ? [
                 'id' => $this->customerGroup->id,
                 'name' => $this->customerGroup->name,
                 'price_field' => $this->customerGroup->price_field,
             ] : null),
-            'order_channel' => 'wholesale',
+            'order_channel' => 'retail',
 
             'created_at' => optional($this->created_at)->toIso8601String(),
         ];

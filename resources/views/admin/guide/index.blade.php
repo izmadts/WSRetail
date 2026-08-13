@@ -41,10 +41,7 @@
                         'sales' => ['fa-shopping-bag', 'Sales'],
                         'sales-returns' => ['fa-undo-alt', 'Sales Returns'],
                         'customer-payments' => ['fa-money-bill', 'Customer Payments'],
-                    ],
-                    'Sales Agents' => [
-                        'agent-management' => ['fa-user-tie', 'Agent Management & Approval'],
-                        'commission' => ['fa-percentage', 'Commission & Bonus Policy'],
+                        'pos' => ['fa-cash-register', 'POS Setup'],
                     ],
                     'HR & Payroll' => [
                         'employees' => ['fa-id-badge', 'Employees & Departments'],
@@ -103,7 +100,7 @@
         <section id="about" class="bg-white rounded-xl shadow-card p-6">
             <h2 class="text-xl font-bold text-gray-900 mb-3"><i class="fas fa-info-circle text-blue-500 mr-2"></i>About This System</h2>
             <p class="text-gray-700 leading-7 mb-3">
-                WSERP is a single connected system for the whole business - inventory, purchasing, sales, sales agents,
+                WSRetail is a single connected system for the whole business - inventory, purchasing, sales,
                 HR & payroll, and full double-entry accounting all live in one place and feed the same ledger. This
                 Guide Book explains, module by module, what each screen is for, exactly what to fill in, and the
                 Standard Operating Procedure (SOP) for keeping data clean and the accounts accurate.
@@ -169,7 +166,7 @@
             <ul class="list-disc pl-6 space-y-1.5 text-gray-700 leading-6 mb-3">
                 <li><strong>Admin</strong> - full access to everything, always. The only role that can reach Settings, Permissions, User accounts, Backups, and this Guide Book's neighboring System tools.</li>
                 <li><strong>Manager</strong> and <strong>Accountant</strong> - log into the same admin panel as Admin, but only see and can act on the modules an Admin has granted them under <a href="#users-permissions" class="text-blue-600 hover:underline">Settings &rarr; Permissions</a>.</li>
-                <li><strong>Sales Agent</strong> - logs into a separate, simpler Agent Portal (their own Sales, Customers, Commission, Leave, Payslips) - never the admin panel.</li>
+                <li><strong>POS Manager</strong> - locked to the POS checkout screen only, optionally locked to one location - can never reach Settings or any other admin module.</li>
             </ul>
             <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <p class="text-blue-900 text-sm leading-6">
@@ -188,7 +185,7 @@
             <ul class="list-disc pl-6 space-y-1.5 text-gray-700 text-sm leading-6 mb-3">
                 <li><strong>Quick Search</strong> (<kbd class="px-1.5 py-0.5 text-xs font-semibold text-gray-600 bg-gray-100 rounded border border-gray-200">Ctrl</kbd>/<kbd class="px-1.5 py-0.5 text-xs font-semibold text-gray-600 bg-gray-100 rounded border border-gray-200">Cmd</kbd>+<kbd class="px-1.5 py-0.5 text-xs font-semibold text-gray-600 bg-gray-100 rounded border border-gray-200">K</kbd>, magnifying-glass icon) - jump straight to a Customer, Supplier, Product, or Sale/Purchase invoice by typing a few characters, from anywhere. Only searches modules you have View access to.</li>
                 <li><strong>Quick Add</strong> (+ icon) - one click to New Sale/Purchase/Product/Customer/Supplier/Expense/Income. Only lists what you have Create access to, and disappears entirely if that's nothing.</li>
-                <li><strong>Notifications</strong> (bell icon) - live counts for Low Stock products, Pending Agent approvals, and Pending Leave requests, each gated the same way as its module. Click a row to go straight to that list, already filtered.</li>
+                <li><strong>Notifications</strong> (bell icon) - live counts for Low Stock products and Pending Leave requests, each gated the same way as its module. Click a row to go straight to that list, already filtered.</li>
                 <li><strong>Fullscreen</strong> (expand icon, desktop only) - toggles the browser's fullscreen mode for distraction-free data entry.</li>
                 <li><strong>Reconcile All Accounts</strong> (red heartbeat icon, admin only) - shortcut straight to the <a href="#reconcile-all" class="text-blue-600 hover:underline">ledger integrity tool</a>.</li>
                 <li><strong>Keyboard Shortcuts</strong> (keyboard icon, desktop only, or press <kbd class="px-1.5 py-0.5 text-xs font-semibold text-gray-600 bg-gray-100 rounded border border-gray-200">?</kbd>) - opens a cheat-sheet of every <kbd class="px-1.5 py-0.5 text-xs font-semibold text-gray-600 bg-gray-100 rounded border border-gray-200">G</kbd> then <kbd class="px-1.5 py-0.5 text-xs font-semibold text-gray-600 bg-gray-100 rounded border border-gray-200">letter</kbd> navigation shortcut (e.g. <kbd class="px-1.5 py-0.5 text-xs font-semibold text-gray-600 bg-gray-100 rounded border border-gray-200">G</kbd> <kbd class="px-1.5 py-0.5 text-xs font-semibold text-gray-600 bg-gray-100 rounded border border-gray-200">S</kbd> for Sales, <kbd class="px-1.5 py-0.5 text-xs font-semibold text-gray-600 bg-gray-100 rounded border border-gray-200">G</kbd> <kbd class="px-1.5 py-0.5 text-xs font-semibold text-gray-600 bg-gray-100 rounded border border-gray-200">P</kbd> for Purchases), filtered to modules you can view. Shortcuts never fire while typing in a text field.</li>
@@ -313,22 +310,21 @@
 
         <section id="customers" class="bg-white rounded-xl shadow-card p-6">
             <h2 class="text-xl font-bold text-gray-900 mb-3"><i class="fas fa-users text-emerald-600 mr-2"></i>Customers</h2>
-            <p class="text-gray-700 leading-7 mb-3">Everyone the business sells to - added directly by staff, or self-registered/added by a Sales Agent (flagged as an Agent Customer).</p>
+            <p class="text-gray-700 leading-7 mb-3">Everyone the business sells to - added directly by staff, or via the Customer API (seller/vendor app integration).</p>
             <p class="font-semibold text-gray-800 text-sm mb-1">Fields</p>
             <p class="text-gray-600 text-sm mb-3">Code, Name, Email, Phone/Mobile, Address, CNIC/NTN, Opening Balance, Credit Limit, Credit Days, Notes, Active/Inactive.</p>
             <p class="font-semibold text-gray-800 text-sm mb-1">SOP</p>
             <ol class="list-decimal pl-6 space-y-1 text-gray-700 text-sm leading-6">
                 <li>Same rule as Suppliers: Opening Balance is entered once, at creation, and posts to Accounts Receivable immediately.</li>
-                <li>An agent-registered customer must be <strong>activated</strong> before their sales count toward agent commission - see <a href="#commission" class="text-blue-600 hover:underline">Commission Policy</a>.</li>
-                <li>Set Credit Limit / Credit Days for any customer who regularly buys on credit - Commission settings can optionally block new credit sales once a customer is overdue past this.</li>
+                <li>Set Credit Limit / Credit Days for any customer who regularly buys on credit - Settings &rarr; Credit can optionally block new credit sales once a customer is overdue past this or over their limit.</li>
             </ol>
         </section>
 
         <section id="sales" class="bg-white rounded-xl shadow-card p-6">
             <h2 class="text-xl font-bold text-gray-900 mb-3"><i class="fas fa-shopping-bag text-emerald-600 mr-2"></i>Sales</h2>
-            <p class="text-gray-700 leading-7 mb-3">Every sale, whether entered by admin/staff or by a Sales Agent from their own portal.</p>
+            <p class="text-gray-700 leading-7 mb-3">Every sale, whether entered through the regular admin sale form or the POS checkout screen.</p>
             <p class="font-semibold text-gray-800 text-sm mb-1">Fields</p>
-            <p class="text-gray-600 text-sm mb-3">Invoice No. (auto), Customer, Agent (optional), Sale Date, Due Date, Payment Term (Cash/Credit), line items, Discount, Tax, Shipping Cost.</p>
+            <p class="text-gray-600 text-sm mb-3">Invoice No. (auto), Customer, Location (optional), Sale Date, Due Date, Payment Term (Cash/Credit), line items, Discount, Tax, Shipping Cost.</p>
             <p class="font-semibold text-gray-800 text-sm mb-1">Status flow</p>
             <p class="text-gray-600 text-sm mb-3"><code class="bg-gray-100 px-1.5 py-0.5 rounded text-xs">Draft</code> &rarr; <code class="bg-gray-100 px-1.5 py-0.5 rounded text-xs">Confirmed</code> &rarr; <code class="bg-gray-100 px-1.5 py-0.5 rounded text-xs">Partial</code> / <code class="bg-gray-100 px-1.5 py-0.5 rounded text-xs">Paid</code>, or <code class="bg-gray-100 px-1.5 py-0.5 rounded text-xs">Cancelled</code>.</p>
             <div class="bg-white border border-gray-200 rounded-lg p-4 mb-3">
@@ -337,8 +333,8 @@
             </div>
             <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-3">
                 <p class="text-red-900 text-sm leading-6">
-                    <strong>Critical rule:</strong> a sale only becomes truly "Paid" - and only then counts for
-                    commission - when a real <strong>payment is recorded</strong> against it
+                    <strong>Critical rule:</strong> a sale only becomes truly "Paid" when a real
+                    <strong>payment is recorded</strong> against it
                     (in full or via "Pay in Full"). Simply changing the Status dropdown to Paid without recording a
                     payment does not move any money in the ledger and will under-count what the customer actually owes.
                     Always create the sale as Draft/Confirmed, then record the payment when it's actually received.
@@ -348,7 +344,6 @@
             <ol class="list-decimal pl-6 space-y-1 text-gray-700 text-sm leading-6">
                 <li>Confirm a sale (move off Draft) only once it's real and stock should actually be committed.</li>
                 <li>For credit sales, always set a sensible Due Date - it drives overdue tracking and the credit-hold policy.</li>
-                <li>If an agent is attached, make sure it's the correct one - it determines whose commission this sale earns.</li>
             </ol>
         </section>
 
@@ -358,7 +353,6 @@
             <div class="bg-white border border-gray-200 rounded-lg p-4 mb-3">
                 <p class="text-sm text-gray-700"><strong>Accounting impact:</strong> <span class="text-red-600">Dr</span> Sales Revenue (4010) / <span class="text-green-600">Cr</span> Accounts Receivable or Cash-Bank (refund) - <em>and</em> the cost side reverses too: <span class="text-red-600">Dr</span> Inventory Stock (1030) back in / <span class="text-green-600">Cr</span> Purchase Cost (5010).</p>
             </div>
-            <p class="text-gray-700 text-sm leading-6">If the sale earned agent commission, the return automatically claws back the proportional commission too - see <a href="#commission" class="text-blue-600 hover:underline">Commission Policy</a>.</p>
         </section>
 
         <section id="customer-payments" class="bg-white rounded-xl shadow-card p-6">
@@ -367,42 +361,17 @@
             <div class="bg-white border border-gray-200 rounded-lg p-4 mb-3">
                 <p class="text-sm text-gray-700"><strong>Accounting impact:</strong> <span class="text-red-600">Dr</span> Cash or Bank Account / <span class="text-green-600">Cr</span> Accounts Receivable (1040).</p>
             </div>
-            <p class="text-gray-700 text-sm leading-6">On a credit sale, every payment recorded also accrues the agent's credit-sale commission for that amount (if applicable).</p>
         </section>
 
-        <!-- ===================== AGENTS ===================== -->
-
-        <section id="agent-management" class="bg-white rounded-xl shadow-card p-6">
-            <h2 class="text-xl font-bold text-gray-900 mb-3"><i class="fas fa-user-tie text-teal-500 mr-2"></i>Agent Management & Approval</h2>
-            <p class="text-gray-700 leading-7 mb-3">Sales Agents self-register through a public registration page and start out <strong>inactive/pending</strong> - they cannot log in or sell anything until an admin approves them.</p>
+        <section id="pos" class="bg-white rounded-xl shadow-card p-6">
+            <h2 class="text-xl font-bold text-gray-900 mb-3"><i class="fas fa-cash-register text-teal-500 mr-2"></i>POS Setup</h2>
+            <p class="text-gray-700 leading-7 mb-3">The POS checkout screen (topbar "POS" button, opens in its own tab) is a faster, cashier-style front end onto the same sale-creation endpoint the regular New Sale form uses - same stock/accounting/credit-gate rules apply, it's just a click-to-add product grid instead of manual rows.</p>
             <p class="font-semibold text-gray-800 text-sm mb-1">SOP</p>
             <ol class="list-decimal pl-6 space-y-1 text-gray-700 text-sm leading-6">
-                <li>Review new agents under Agents &rarr; Pending Approvals (badge shows the count) and approve or reject.</li>
-                <li>Approving an agent also flips their linked HR Employee record active automatically - no separate HR step needed.</li>
-                <li>Set each agent's monthly Sales Target here so target-bonus tracking has something to measure against.</li>
+                <li>Set up each physical location under Settings &rarr; Locations, choosing its POS Use (Retail only, Wholesale only, or Both) - this locks which products/pricing a sale from that location can use.</li>
+                <li>Configure defaults (default location/customer, receipt paper size, enabled payment methods, barcode label format) under Settings &rarr; POS Settings.</li>
+                <li>For a cashier who should only ever use the POS - never the rest of the admin panel - create them as a <strong>POS Manager</strong> under Settings &rarr; Users, with a fixed Location. Their POS screen shows that location as locked (no switcher), and the server re-enforces it on every sale regardless of what the browser sends.</li>
             </ol>
-        </section>
-
-        <section id="commission" class="bg-white rounded-xl shadow-card p-6">
-            <h2 class="text-xl font-bold text-gray-900 mb-3"><i class="fas fa-percentage text-teal-500 mr-2"></i>Commission & Bonus Policy</h2>
-            <p class="text-gray-700 leading-7 mb-3">All commission rules are admin-configurable under Settings &rarr; Commission & Bonus - nothing here is hardcoded, so always check that page for the current live rates. The policy has several independent pieces:</p>
-            <ul class="list-disc pl-6 space-y-1.5 text-gray-700 text-sm leading-6 mb-3">
-                <li><strong>Cash sale commission</strong> - a progressive rate based on the agent's month-to-date cumulative cash sales (higher cumulative sales unlock a higher rate on that sale).</li>
-                <li><strong>Credit sale commission</strong> - a flat % of every payment actually recovered on a credit sale, accrued the moment each payment is recorded (not held until the whole invoice is settled).</li>
-                <li><strong>New customer bonus</strong> - a fixed amount once a customer the agent registered reaches a minimum number of orders and is active.</li>
-                <li><strong>Recovery bonus</strong> - an extra % once a sale's recovery rate crosses a configured threshold.</li>
-                <li><strong>Monthly target bonus</strong> - tiered bonus (e.g. 100% / 120% / 150% of target achieved) closed out once per month via "Close Month."</li>
-            </ul>
-            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-3">
-                <p class="text-blue-900 text-sm leading-6">
-                    Commission for a sale requires the sale's customer to be an <strong>active, verified</strong>
-                    agent-registered customer (the "Salesman Rule") - commission is intentionally not paid on sales to
-                    customers who never activated. This can be relaxed in Settings if not wanted.
-                </p>
-            </div>
-            <p class="font-semibold text-gray-800 text-sm mb-1">Accounting & payout</p>
-            <p class="text-gray-700 text-sm leading-6 mb-3">Every accrual posts <span class="text-red-600">Dr</span> Agent Commission Expense (5020) / <span class="text-green-600">Cr</span> Agent Commission Payable (2020) immediately. Paying an agent (Agents &rarr; an agent &rarr; Pay Commission) allocates the payment across their oldest unpaid commission first and posts <span class="text-red-600">Dr</span> Commission Payable (2020) / <span class="text-green-600">Cr</span> Cash/Bank.</p>
-            <p class="text-gray-700 text-sm leading-6">Run <strong>Close Month</strong> once, after month-end, to lock in target bonuses - running it twice for the same month is safe (it won't double-pay), but it should still only be run once the month's sales are final.</p>
         </section>
 
         <!-- ===================== HR ===================== -->
@@ -411,7 +380,7 @@
             <h2 class="text-xl font-bold text-gray-900 mb-3"><i class="fas fa-id-badge text-indigo-500 mr-2"></i>Employees & Departments</h2>
             <p class="text-gray-700 leading-7 mb-3">The HR employee register. Two ways an Employee record can exist:</p>
             <ul class="list-disc pl-6 space-y-1.5 text-gray-700 text-sm leading-6 mb-3">
-                <li><strong>Auto-linked</strong> - the instant anyone gets a system login (admin/manager/accountant/sales agent), an Employee record is created for them automatically. Nothing to do here.</li>
+                <li><strong>Auto-linked</strong> - the instant anyone gets a system login (admin/manager/accountant/pos_manager), an Employee record is created for them automatically. Nothing to do here.</li>
                 <li><strong>Standalone</strong> - added manually here, for staff who never log into the software at all (warehouse, delivery, other operational/supply-chain roles). Can later be given a login via "Grant System Access" on their profile, without creating a duplicate. <strong>Admin-only</strong> - deliberately not covered by the Employees permission, since it can create an admin/manager/accountant login, the same sensitivity as adding one under Settings &rarr; Users.</li>
             </ul>
             <p class="font-semibold text-gray-800 text-sm mb-1">Fields</p>
@@ -426,11 +395,11 @@
 
         <section id="leave" class="bg-white rounded-xl shadow-card p-6">
             <h2 class="text-xl font-bold text-gray-900 mb-3"><i class="fas fa-calendar-check text-indigo-500 mr-2"></i>Leave Management</h2>
-            <p class="text-gray-700 leading-7 mb-3">Simple request &rarr; approve/reject workflow, shared by admin panel self-service ("My Leave") and the Agent Portal.</p>
+            <p class="text-gray-700 leading-7 mb-3">Simple request &rarr; approve/reject workflow via the admin panel's self-service "My Leave" page.</p>
             <p class="font-semibold text-gray-800 text-sm mb-1">SOP</p>
             <ol class="list-decimal pl-6 space-y-1 text-gray-700 text-sm leading-6">
                 <li>Set up Leave Types first (e.g. Annual, Sick, Casual, Unpaid), each with its own default days/year and whether it's paid.</li>
-                <li>Any staff member with a login requests their own leave from "My Leave" (or Agents from their portal); an admin/manager with the <strong>leaves</strong> permission approves or rejects it under Leave Requests.</li>
+                <li>Any staff member with a login requests their own leave from "My Leave"; an admin/manager with the <strong>leaves</strong> permission approves or rejects it under Leave Requests.</li>
                 <li>Remaining balance is always calculated live from approved requests for the current year - it is never a number you edit directly.</li>
                 <li>Only the employee who submitted a still-pending request can cancel it themselves.</li>
             </ol>
@@ -448,8 +417,8 @@
                 <p class="text-sm text-gray-700"><strong>Accounting impact (paying a payslip):</strong> <span class="text-red-600">Dr</span> Salary Payable (2030) / <span class="text-green-600">Cr</span> Cash/Bank.</p>
             </div>
             <p class="font-semibold text-gray-800 text-sm mb-1">Step 3 - Pay Payslips</p>
-            <p class="text-gray-700 text-sm leading-6 mb-3">Open a processed run and use "Pay" on each payslip once salary is actually disbursed. Unlike agent commission, a salary payment is one discrete payment per payslip, not a running tab.</p>
-            <p class="text-gray-700 text-sm leading-6">Employees see their own payslip history under "My Payslips" (admin panel) or the Agent Portal.</p>
+            <p class="text-gray-700 text-sm leading-6 mb-3">Open a processed run and use "Pay" on each payslip once salary is actually disbursed - a discrete payment per payslip, not a running tab.</p>
+            <p class="text-gray-700 text-sm leading-6">Employees see their own payslip history under "My Payslips" in the admin panel.</p>
         </section>
 
         <!-- ===================== FINANCE ===================== -->
@@ -493,10 +462,10 @@
             <p class="text-gray-700 leading-7 mb-3">The complete list of accounts every module posts to, organized by numeric block:</p>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-gray-700 mb-3">
                 <p><strong>1000s Assets</strong> - Cash (1010), Bank (1020), Inventory Stock (1030), Accounts Receivable (1040)</p>
-                <p><strong>2000s Liabilities</strong> - Accounts Payable (2010), Commission Payable (2020), Salary Payable (2030)</p>
+                <p><strong>2000s Liabilities</strong> - Accounts Payable (2010), Salary Payable (2030)</p>
                 <p><strong>3000s Equity</strong> - Owner's Capital (3010), Opening Balance Equity (3020)</p>
                 <p><strong>4000s Revenue</strong> - Sales Revenue (4010), Other Income (4020)</p>
-                <p><strong>5000s Expense</strong> - Purchase Cost / COGS (5010), Commission Expense (5020), General Expenses (5030), Inventory Shrinkage (5040), Salary Expense (5050)</p>
+                <p><strong>5000s Expense</strong> - Purchase Cost / COGS (5010), General Expenses (5030), Inventory Shrinkage (5040), Salary Expense (5050)</p>
             </div>
             <p class="font-semibold text-gray-800 text-sm mb-1">SOP</p>
             <ol class="list-decimal pl-6 space-y-1 text-gray-700 text-sm leading-6">
@@ -519,7 +488,7 @@
 
         <section id="reconcile-all" class="bg-white rounded-xl shadow-card p-6">
             <h2 class="text-xl font-bold text-gray-900 mb-3"><i class="fas fa-magic text-cyan-500 mr-2"></i>Reconcile All Accounts</h2>
-            <p class="text-gray-700 leading-7 mb-3">An admin-only Dashboard button that scans <em>every</em> transaction type in the system (purchases, sales, returns, payments, commission, payroll, adjustments...) and checks that each one's ledger entries actually exist, are balanced, and match its own stored amount.</p>
+            <p class="text-gray-700 leading-7 mb-3">An admin-only Dashboard button that scans <em>every</em> transaction type in the system (purchases, sales, returns, payments, payroll, adjustments...) and checks that each one's ledger entries actually exist, are balanced, and match its own stored amount.</p>
             <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-3">
                 <p class="text-blue-900 text-sm leading-6">
                     This is the tool to reach for whenever a balance looks wrong and you can't tell why - it doesn't
@@ -541,7 +510,7 @@
                 <li><strong>Trial Balance</strong> - every account's total debits/credits, to confirm the books balance.</li>
                 <li><strong>Day Book</strong> - every Journal Entry for a single day, the rawest possible view of what happened.</li>
                 <li><strong>Receivable / Payable</strong> - who owes the business, and who the business owes, right now.</li>
-                <li><strong>Customers / Suppliers / Agents</strong> - performance and balance summaries per party.</li>
+                <li><strong>Customers / Suppliers</strong> - performance and balance summaries per party.</li>
                 <li><strong>Expenses / Income</strong> - breakdowns by category and date range.</li>
                 <li><strong>Daily Summary</strong> - a single day's sales, purchases, expenses and cash movement at a glance.</li>
                 <li><strong>Tax Report</strong> - tax collected/paid across sales and purchases.</li>
@@ -556,7 +525,8 @@
             <ul class="list-disc pl-6 space-y-1 text-gray-700 text-sm leading-6 mb-3">
                 <li><strong>General</strong> - business name, logo, favicon, currency code/symbol, timezone, date format, theme color, dark mode.</li>
                 <li><strong>Customer Groups</strong> - pricing/segmentation groups for customers.</li>
-                <li><strong>Commission & Bonus</strong> - every number behind the <a href="#commission" class="text-blue-600 hover:underline">Commission Policy</a>.</li>
+                <li><strong>Locations</strong> and <strong>POS Settings</strong> - see <a href="#pos" class="text-blue-600 hover:underline">POS Setup</a>.</li>
+                <li><strong>Credit</strong> - the credit-hold/credit-limit policy for blocking new credit sales.</li>
             </ul>
             <p class="text-gray-700 text-sm leading-6">Changing Currency or Timezone here affects how every figure and date displays app-wide - double-check before saving, ideally outside business hours.</p>
         </section>
@@ -594,7 +564,7 @@
 
         <section id="exports" class="bg-white rounded-xl shadow-card p-6">
             <h2 class="text-xl font-bold text-gray-900 mb-3"><i class="fas fa-file-export text-gray-600 mr-2"></i>Exports</h2>
-            <p class="text-gray-700 leading-7">Sales, Purchases, Customers, Suppliers, Expenses, Income, Agents, and Receivable data can each be exported to CSV, Excel, or PDF from their respective list pages - useful for sharing with an accountant or importing into another tool, without giving that person system access.</p>
+            <p class="text-gray-700 leading-7">Sales, Purchases, Customers, Suppliers, Expenses, Income, and Receivable data can each be exported to CSV, Excel, or PDF from their respective list pages - useful for sharing with an accountant or importing into another tool, without giving that person system access.</p>
         </section>
 
         <!-- ===================== GOLDEN RULES ===================== -->

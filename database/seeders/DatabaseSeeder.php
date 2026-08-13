@@ -29,7 +29,7 @@ class DatabaseSeeder extends Seeder
             CustomerSeeder::class,
             ExpenseCategorySeeder::class,
             IncomeCategorySeeder::class,
-            CommissionSettingsSeeder::class,
+            CustomerCreditSettingsSeeder::class,
             CustomerGroupSeeder::class,
             RolePermissionSeeder::class,
         ]);

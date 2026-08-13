@@ -31,7 +31,6 @@ class ExportHelper
             'suppliers' => ['Code', 'Name', 'Email', 'Phone', 'City', 'Total Purchases', 'Balance', 'Status'],
             'expenses' => ['Expense No', 'Title', 'Category', 'Amount', 'Date', 'Payment Method', 'Status'],
             'incomes' => ['Income No', 'Title', 'Category', 'Amount', 'Date', 'Payment Method', 'Source'],
-            'agents' => ['Name', 'Email', 'Phone', 'City', 'Total Customers', 'Total Sales', 'Total Commission', 'Status'],
             'receivable' => ['Code', 'Customer Name', 'Phone', 'City', 'Total Sales', 'Total Paid', 'Balance'],
         ];
 
@@ -109,18 +108,6 @@ class ExportHelper
                     $row->income_date->format('d-m-Y'),
                     $row->payment_method_label,
                     $row->source_label,
-                ];
-
-            case 'agents':
-                return [
-                    $sanitize($row->name),
-                    $sanitize($row->email),
-                    $sanitize($row->phone ?? ''),
-                    $sanitize($row->city ?? ''),
-                    $row->customers()->count(),
-                    number_format($row->sales()->whereIn('status', ['confirmed', 'partial', 'paid'])->sum('total_amount'), 2),
-                    number_format($row->commissionLogs()->sum('amount'), 2),
-                    $row->is_active ? 'Active' : 'Inactive',
                 ];
 
             case 'receivable':

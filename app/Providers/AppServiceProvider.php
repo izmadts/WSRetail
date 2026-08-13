@@ -107,9 +107,9 @@ class AppServiceProvider extends ServiceProvider
         // would otherwise run this query again for every partial/component
         // include on the page, not just once per request.
         View::composer(
-            ['layouts.admin', 'layouts.agent', 'layouts.guest', 'auth.login', 'auth.register'],
+            ['layouts.admin', 'layouts.guest', 'layouts.pos', 'auth.login', 'auth.register'],
             function ($view) {
-                $settings = Setting::whereIn('key', ['app_name', 'logo', 'favicon', 'theme_color', 'dark_mode_enabled'])
+                $settings = Setting::whereIn('key', ['app_name', 'logo', 'favicon', 'theme_color', 'dark_mode_enabled', 'demo_mode', 'demo_credentials_note'])
                     ->pluck('value', 'key');
                 $view->with('siteName', $settings['app_name'] ?? config('app.name'));
                 $view->with('siteLogo', $settings['logo'] ?? null);
@@ -120,6 +120,12 @@ class AppServiceProvider extends ServiceProvider
                 // true/false, so this can't just be a truthiness check on
                 // the string (empty string IS falsy, but "0" is truthy).
                 $view->with('darkModeEnabled', ($settings['dark_mode_enabled'] ?? '1') === '1');
+                // Demo Mode (Settings > General) - shows a credentials hint on
+                // the login page. Off by default on every install, including
+                // fresh clones of the public repo; an admin turns it on
+                // deliberately only on the owner's own public demo instance.
+                $view->with('demoMode', ($settings['demo_mode'] ?? '0') === '1');
+                $view->with('demoCredentialsNote', $settings['demo_credentials_note'] ?? null);
             }
         );
     }

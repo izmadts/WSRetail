@@ -5,10 +5,9 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * Deliberately 1:1 per payslip (not the FIFO multi-log allocation
- * CommissionService::payCommission() uses for agent payouts) - a monthly
- * salary is one discrete obligation per period, not a running tab across
- * many small earned amounts.
+ * Deliberately 1:1 per payslip - a monthly salary is one discrete
+ * obligation per period, not a running tab across many small earned
+ * amounts.
  */
 class SalaryPayment extends Model
 {

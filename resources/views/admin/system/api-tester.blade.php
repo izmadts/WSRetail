@@ -1,7 +1,7 @@
 @extends('layouts.admin')
 
 @section('title', 'API Testing')
-@section('page-title', 'Sale Agent API Tester')
+@section('page-title', 'Customer API Tester')
 
 @section('content')
 <div x-data="apiTester()" x-init="init()" class="space-y-4">
@@ -10,8 +10,8 @@
         <i class="fas fa-exclamation-triangle text-yellow-600 mt-0.5"></i>
         <div class="text-sm text-yellow-800">
             <strong>This tool makes real requests against live data</strong> - a POST/PUT/DELETE sent here has
-            the exact same effect as the same request from the Flutter app (creates real sales, deducts real
-            stock, posts real ledger entries). Use a test agent account, not production data, unless you mean it.
+            the exact same effect as the same request from the storefront (creates real orders/customers).
+            Use a test customer, not production data, unless you mean it.
             See the <a href="{{ route('admin.system.api.docs') }}" class="underline font-medium">API Documentation</a> for request/response shapes.
         </div>
     </div>
@@ -28,7 +28,7 @@
                         <div class="space-y-0.5">
                             <template x-for="p in group.items" :key="p.method + p.path">
                                 <button type="button" @click="selectPreset(p)"
-                                        class="w-full text-left px-2 py-1.5 rounded-lg hover:bg-blue-50 flex items-center gap-2 text-xs">
+                                        class="w-full text-left px-2 py-1.5 rounded-lg hover:bg-purple-50 flex items-center gap-2 text-xs">
                                     <span class="font-mono font-bold w-10 flex-shrink-0"
                                           :class="{'text-blue-600': p.method === 'GET', 'text-green-600': p.method === 'POST', 'text-yellow-600': p.method === 'PUT', 'text-red-600': p.method === 'DELETE'}"
                                           x-text="p.method"></span>
@@ -44,30 +44,26 @@
         <!-- Request builder + response -->
         <div class="lg:col-span-3 space-y-4">
 
-            <!-- Login Helper -->
+            <!-- Connect Helper -->
             <div class="bg-white rounded-xl shadow-card p-4">
-                <p class="text-sm font-semibold text-gray-700 mb-2"><i class="fas fa-key text-purple-600 mr-1"></i> Login Helper</p>
+                <p class="text-sm font-semibold text-gray-700 mb-2"><i class="fas fa-plug text-purple-600 mr-1"></i> Connect Helper</p>
+                <p class="text-xs text-gray-500 mb-2">Calls <code>/connect</code> with the integration key below to obtain a token for a customer, same as the storefront's one-time login.</p>
                 <div class="grid grid-cols-1 sm:grid-cols-4 gap-2 items-end">
                     <div class="sm:col-span-2">
-                        <label class="block text-xs text-gray-500 mb-1">Agent Email</label>
-                        <input type="email" x-model="loginEmail" placeholder="agent@example.com" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg">
+                        <label class="block text-xs text-gray-500 mb-1">Name</label>
+                        <input type="text" x-model="connectName" placeholder="Test Seller" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg">
                     </div>
-                    <div class="sm:col-span-1" x-data="{ showPassword: false }">
-                        <label class="block text-xs text-gray-500 mb-1">Password</label>
-                        <div class="relative">
-                            <input :type="showPassword ? 'text' : 'password'" x-model="loginPassword" class="w-full px-2 py-1.5 pr-8 text-sm border border-gray-300 rounded-lg">
-                            <button type="button" @click="showPassword = !showPassword" tabindex="-1" class="absolute inset-y-0 right-0 pr-2 flex items-center text-gray-500 hover:text-purple-600">
-                                <i class="fas text-xs" :class="showPassword ? 'fa-eye-slash' : 'fa-eye'"></i>
-                            </button>
-                        </div>
+                    <div class="sm:col-span-2">
+                        <label class="block text-xs text-gray-500 mb-1">Phone</label>
+                        <input type="text" x-model="connectPhone" placeholder="03001234567" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg">
                     </div>
-                    <button type="button" @click="doLogin()" :disabled="loginLoading"
-                            class="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 disabled:opacity-50">
-                        <span x-show="!loginLoading"><i class="fas fa-sign-in-alt mr-1"></i> Login &amp; Fill Token</span>
-                        <span x-show="loginLoading"><i class="fas fa-spinner fa-spin mr-1"></i> Logging in...</span>
+                    <button type="button" @click="doConnect()" :disabled="connectLoading"
+                            class="sm:col-span-4 px-3 py-1.5 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 disabled:opacity-50">
+                        <span x-show="!connectLoading"><i class="fas fa-plug mr-1"></i> Connect &amp; Fill Token</span>
+                        <span x-show="connectLoading"><i class="fas fa-spinner fa-spin mr-1"></i> Connecting...</span>
                     </button>
                 </div>
-                <p class="text-xs text-gray-500 mt-2" x-show="loginNote" x-text="loginNote"></p>
+                <p class="text-xs text-gray-500 mt-2" x-show="connectNote" x-text="connectNote"></p>
             </div>
 
             <!-- Request Builder -->
@@ -82,7 +78,7 @@
                         <option value="PATCH">PATCH</option>
                         <option value="DELETE">DELETE</option>
                     </select>
-                    <input type="text" x-model="path" placeholder="/dashboard"
+                    <input type="text" x-model="path" placeholder="/products"
                            class="flex-1 min-w-[200px] px-2 py-1.5 text-sm border border-gray-300 rounded-lg font-mono">
                     <button type="button" @click="send()" :disabled="loading"
                             class="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
@@ -92,9 +88,18 @@
                 </div>
                 <p class="text-xs text-gray-400 mb-3 font-mono" x-text="baseUrl + path"></p>
 
-                <label class="block text-xs text-gray-500 mb-1">Bearer Token</label>
-                <input type="text" x-model="token" placeholder="Paste a token, or use the Login Helper above"
-                       class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg font-mono mb-3">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Bearer Token (customer)</label>
+                        <input type="text" x-model="token" placeholder="Paste a token, or use Connect Helper above"
+                               class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">X-Integration-Key (only needed for /connect)</label>
+                        <input type="text" x-model="integrationKey" placeholder="shared secret"
+                               class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg font-mono">
+                    </div>
+                </div>
 
                 <div x-show="['POST', 'PUT', 'PATCH'].includes(method)">
                     <label class="block text-xs text-gray-500 mb-1">JSON Body</label>
@@ -125,65 +130,46 @@
 <script>
 function apiTester() {
     return {
-        baseUrl: '{{ url('/api/v1/agent') }}',
+        baseUrl: '{{ url('/api/v1/customer') }}',
         token: '',
+        integrationKey: '',
         method: 'GET',
-        path: '/dashboard',
+        path: '/products',
         body: '',
         loading: false,
         response: null,
-        loginEmail: '',
-        loginPassword: '',
-        loginLoading: false,
-        loginNote: '',
+        connectName: '',
+        connectPhone: '',
+        connectLoading: false,
+        connectNote: '',
 
         presetGroups: [
             { label: 'Auth', items: [
-                { method: 'POST', path: '/login', body: { email: 'agent@example.com', password: 'secret', device_name: 'api-tester' } },
+                { method: 'POST', path: '/connect', body: { name: 'Test Seller', phone: '03001234567', device_name: 'api-tester' } },
                 { method: 'POST', path: '/logout', body: null },
                 { method: 'GET', path: '/me', body: null },
-                { method: 'PUT', path: '/me', body: { name: 'Agent Name', email: 'agent@example.com', city: 'Karachi' } },
-                { method: 'PUT', path: '/me/password', body: { current_password: 'old-pass', password: 'new-pass-123', password_confirmation: 'new-pass-123' } },
+                { method: 'PUT', path: '/me', body: { name: 'Updated Name', city: 'Karachi' } },
             ]},
-            { label: 'Dashboard', items: [
-                { method: 'GET', path: '/dashboard', body: null },
-            ]},
-            { label: 'Customers', items: [
-                { method: 'GET', path: '/customers', body: null },
-                { method: 'POST', path: '/customers', body: { name: 'Test Customer', phone: '03001234567', customer_group_id: 1, is_active: true } },
-                { method: 'GET', path: '/customers/1', body: null },
-                { method: 'PUT', path: '/customers/1', body: { name: 'Updated Name', is_active: true } },
-                { method: 'DELETE', path: '/customers/1', body: null },
-                { method: 'GET', path: '/customer-groups', body: null },
-            ]},
-            { label: 'Products', items: [
+            { label: 'Catalog', items: [
+                { method: 'GET', path: '/categories', body: null },
                 { method: 'GET', path: '/products', body: null },
-                { method: 'GET', path: '/products?customer_id=1', body: null },
             ]},
-            { label: 'Sales', items: [
-                { method: 'GET', path: '/sales', body: null },
-                { method: 'POST', path: '/sales', body: { customer_id: 1, sale_date: new Date().toISOString().slice(0, 10), payment_term: 'cash', status: 'confirmed', items: [{ product_id: 1, quantity: 1, unit_price: 100 }] } },
-                { method: 'GET', path: '/sales/1', body: null },
-                { method: 'PUT', path: '/sales/1', body: { customer_id: 1, sale_date: new Date().toISOString().slice(0, 10), payment_term: 'cash', status: 'draft', items: [{ product_id: 1, quantity: 1, unit_price: 100 }] } },
-                { method: 'DELETE', path: '/sales/1', body: null },
-                { method: 'POST', path: '/sales/1/payments', body: { amount: 100, payment_date: new Date().toISOString().slice(0, 10), payment_method: 'cash' } },
-            ]},
-            { label: 'Commissions', items: [
-                { method: 'GET', path: '/commissions', body: null },
-                { method: 'GET', path: '/commissions/summary', body: null },
-            ]},
-            { label: 'Reports', items: [
-                { method: 'GET', path: '/reports/overview', body: null },
-                { method: 'GET', path: '/reports/sales', body: null },
-                { method: 'GET', path: '/reports/commission', body: null },
-                { method: 'GET', path: '/reports/target', body: null },
+            { label: 'Orders', items: [
+                { method: 'GET', path: '/orders', body: null },
+                { method: 'POST', path: '/orders', body: { sale_date: new Date().toISOString().slice(0, 10), payment_term: 'cash', items: [{ product_id: 1, quantity: 1 }] } },
+                { method: 'GET', path: '/orders/1', body: null },
+                { method: 'POST', path: '/orders/1/cancel', body: null },
             ]},
         ],
 
         init() {
-            const saved = localStorage.getItem('api_tester_token');
-            if (saved) this.token = saved;
-            this.$watch('token', (value) => localStorage.setItem('api_tester_token', value || ''));
+            const savedToken = localStorage.getItem('api_tester_customer_token');
+            if (savedToken) this.token = savedToken;
+            this.$watch('token', (value) => localStorage.setItem('api_tester_customer_token', value || ''));
+
+            const savedKey = localStorage.getItem('api_tester_integration_key');
+            if (savedKey) this.integrationKey = savedKey;
+            this.$watch('integrationKey', (value) => localStorage.setItem('api_tester_integration_key', value || ''));
         },
 
         selectPreset(preset) {
@@ -201,6 +187,7 @@ function apiTester() {
             try {
                 const headers = { 'Accept': 'application/json' };
                 if (this.token) headers['Authorization'] = 'Bearer ' + this.token;
+                if (this.integrationKey) headers['X-Integration-Key'] = this.integrationKey;
 
                 const options = { method: this.method, headers };
                 if (['POST', 'PUT', 'PATCH'].includes(this.method) && this.body.trim()) {
@@ -229,30 +216,34 @@ function apiTester() {
             }
         },
 
-        async doLogin() {
-            if (!this.loginEmail || !this.loginPassword) {
-                this.loginNote = 'Enter an email and password first.';
+        async doConnect() {
+            if (!this.connectName || !this.connectPhone) {
+                this.connectNote = 'Enter a name and phone first.';
                 return;
             }
-            this.loginLoading = true;
-            this.loginNote = '';
+            if (!this.integrationKey) {
+                this.connectNote = 'Enter the X-Integration-Key above first.';
+                return;
+            }
+            this.connectLoading = true;
+            this.connectNote = '';
             try {
-                const res = await fetch(this.baseUrl + '/login', {
+                const res = await fetch(this.baseUrl + '/connect', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                    body: JSON.stringify({ email: this.loginEmail, password: this.loginPassword, device_name: 'api-tester' }),
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Integration-Key': this.integrationKey },
+                    body: JSON.stringify({ name: this.connectName, phone: this.connectPhone, device_name: 'api-tester' }),
                 });
                 const data = await res.json();
                 if (res.ok && data.success) {
                     this.token = data.data.token;
-                    this.loginNote = 'Logged in as ' + data.data.agent.name + ' - token filled in below.';
+                    this.connectNote = 'Connected as ' + data.data.customer.name + ' - token filled in below.';
                 } else {
-                    this.loginNote = 'Login failed: ' + (data.message || res.statusText);
+                    this.connectNote = 'Connect failed: ' + (data.message || res.statusText);
                 }
             } catch (e) {
-                this.loginNote = 'Network error: ' + e.message;
+                this.connectNote = 'Network error: ' + e.message;
             } finally {
-                this.loginLoading = false;
+                this.connectLoading = false;
             }
         },
     };

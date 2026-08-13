@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\DB;
  * Extends Authenticatable (not the plain Model) so a Customer can hold
  * Sanctum tokens and be resolved by $request->user() on customer API routes
  * - see App\Http\Controllers\Api\Customer\AuthController::connect(). There
- * is no password-based login: identity is established by the seller app's
+ * is no password-based login: identity is established by the storefront's
  * one-time /connect call (behind the integration key), not by a customer
  * typing a password, so getAuthPassword() is never actually invoked.
  */
@@ -38,8 +38,6 @@ class Customer extends Authenticatable
         'credit_days',
         'notes',
         'is_active',
-        'created_by_agent_id',
-        'is_agent_customer',
         'customer_group_id',
         'activated_at',
         'order_count',
@@ -54,7 +52,6 @@ class Customer extends Authenticatable
         'credit_limit' => 'decimal:2',
         'credit_days' => 'integer',
         'is_active' => 'boolean',
-        'is_agent_customer' => 'boolean',
         'activated_at' => 'datetime',
     ];
 
@@ -96,11 +93,6 @@ class Customer extends Authenticatable
         return $this->hasMany(CustomerPayment::class);
     }
 
-    public function createdByAgent()
-    {
-        return $this->belongsTo(User::class, 'created_by_agent_id');
-    }
-
     public function customerGroup()
     {
         return $this->belongsTo(CustomerGroup::class);
@@ -113,11 +105,6 @@ class Customer extends Authenticatable
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
-    }
-
-    public function scopeAgentCustomers($query, $agentId)
-    {
-        return $query->where('created_by_agent_id', $agentId);
     }
 
     // =============================================
@@ -191,10 +178,6 @@ class Customer extends Authenticatable
         return $this->is_active && $this->order_count >= 3;
     }
 
-    public function getNewCustomerBonusEligibleAttribute()
-    {
-        return $this->is_active && $this->order_count >= 3 && $this->is_agent_customer;
-    }
     // =============================================
     // HELPER METHODS
     // =============================================

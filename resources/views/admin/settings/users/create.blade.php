@@ -33,6 +33,7 @@
                             <option value="admin" {{ old('role') == 'admin' ? 'selected' : '' }}>Admin</option>
                             <option value="manager" {{ old('role') == 'manager' ? 'selected' : '' }}>Manager</option>
                             <option value="accountant" {{ old('role') == 'accountant' ? 'selected' : '' }}>Accountant</option>
+                            <option value="pos_manager" {{ old('role') == 'pos_manager' ? 'selected' : '' }}>POS Manager</option>
                         </select>
                         @error('role')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
                     </div>
@@ -41,6 +42,19 @@
                         <input type="text" name="phone" value="{{ old('phone') }}"
                             class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                        POS Location
+                        <x-help-tooltip>Required for a POS Manager - locks their POS screen to this one location (no switcher shown, can't sell as another location). Optional for other roles; leave blank to leave them unrestricted.</x-help-tooltip>
+                    </label>
+                    <select name="location_id" class="w-full sm:w-1/2 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">No fixed location</option>
+                        @foreach($locations as $loc)
+                        <option value="{{ $loc->id }}" {{ old('location_id') == $loc->id ? 'selected' : '' }}>{{ $loc->name }} ({{ ucfirst($loc->pos_type) }})</option>
+                        @endforeach
+                    </select>
+                    @error('location_id')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>

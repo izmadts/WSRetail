@@ -1,8 +1,10 @@
 import Alpine from 'alpinejs';
+import JsBarcode from 'jsbarcode';
 // import Livewire from 'livewire';
 
 // ✅ Prevent multiple Alpine instances
 window.Alpine = Alpine;
+window.JsBarcode = JsBarcode;
 
 // ✅ Start Alpine
 Alpine.start();

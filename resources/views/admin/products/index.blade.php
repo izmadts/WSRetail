@@ -21,7 +21,11 @@
                     <span class="ml-1 bg-yellow-200 text-yellow-800 px-2 py-0.5 rounded-full text-xs">{{ $count }}</span>
                 @endif
             </a>
-            <a href="{{ route('admin.products.create') }}" 
+            <a href="{{ route('admin.products.barcode.index') }}"
+               class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors duration-200">
+                <i class="fas fa-barcode mr-1"></i> Print Barcodes
+            </a>
+            <a href="{{ route('admin.products.create') }}"
                class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors duration-200">
                 <i class="fas fa-plus mr-1"></i> Add Product
             </a>
@@ -52,35 +56,47 @@
                         </td>
                         <td class="py-3 px-2">
                             <span class="font-medium text-gray-900">{{ $product->name }}</span>
+                            @if($product->has_variants)
+                                <span class="ml-1 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                                    <i class="fas fa-layer-group mr-1"></i> {{ $product->variants->count() }} variants
+                                </span>
+                            @endif
                         </td>
                         <td class="py-3 px-2 text-sm text-gray-600">
                             {{ $product->category->name ?? '-' }}
                         </td>
                         <td class="py-3 px-2 text-sm text-gray-600">{{ $product->unit }}</td>
+                        @if($product->has_variants)
+                        <td class="py-3 px-2 text-right text-sm text-gray-400">varies</td>
+                        <td class="py-3 px-2 text-right text-sm text-gray-600">
+                            Rs. {{ number_format($product->variants->min('sale_price'), 2) }}&ndash;{{ number_format($product->variants->max('sale_price'), 2) }}
+                        </td>
+                        @else
                         <td class="py-3 px-2 text-right text-sm text-gray-600">
                             Rs. {{ number_format($product->purchase_price, 2) }}
                         </td>
                         <td class="py-3 px-2 text-right text-sm text-gray-600">
                             Rs. {{ number_format($product->sale_price, 2) }}
                         </td>
+                        @endif
                         <td class="py-3 px-2 text-center">
                             @if($product->isLowStock())
                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
                                     <i class="fas fa-exclamation-circle mr-1"></i>
-                                    {{ number_format($product->current_stock, 2) }}
+                                    {{ number_format($product->totalStock(), 2) }}
                                 </span>
                             @elseif($product->isOverStock())
                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
                                     <i class="fas fa-box-open mr-1"></i>
-                                    {{ number_format($product->current_stock, 2) }}
+                                    {{ number_format($product->totalStock(), 2) }}
                                 </span>
-                            @elseif($product->current_stock == 0)
+                            @elseif($product->totalStock() == 0)
                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-                                    {{ number_format($product->current_stock, 2) }}
+                                    {{ number_format($product->totalStock(), 2) }}
                                 </span>
                             @else
                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                    {{ number_format($product->current_stock, 2) }}
+                                    {{ number_format($product->totalStock(), 2) }}
                                 </span>
                             @endif
                         </td>

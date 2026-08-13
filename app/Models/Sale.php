@@ -11,11 +11,9 @@ class Sale extends Model
     use SoftDeletes;
 
     protected $fillable = [
-        'invoice_no', 'customer_id', 'agent_id', 'source', 'sale_date', 'due_date',
+        'invoice_no', 'customer_id', 'location_id', 'source', 'sale_date', 'due_date',
         'payment_term', 'status', 'sub_total', 'discount', 'discount_type',
-        'tax', 'shipping_cost', 'total_amount', 'commission_amount',
-        'commission_paid_amount', 'commission_due_amount', 'recovery_percentage',
-        'is_commission_held', 'commission_hold_reason',
+        'tax', 'shipping_cost', 'total_amount',
         'paid_amount', 'due_amount', 'refunded_amount', 'notes', 'created_by'
     ];
 
@@ -27,11 +25,6 @@ class Sale extends Model
         'tax' => 'decimal:2',
         'shipping_cost' => 'decimal:2',
         'total_amount' => 'decimal:2',
-        'commission_amount' => 'decimal:2',
-        'commission_paid_amount' => 'decimal:2',
-        'commission_due_amount' => 'decimal:2',
-        'recovery_percentage' => 'decimal:2',
-        'is_commission_held' => 'boolean',
         'paid_amount' => 'decimal:2',
         'due_amount' => 'decimal:2',
         'refunded_amount' => 'decimal:2',
@@ -78,29 +71,14 @@ class Sale extends Model
         $this->due_amount = $this->total_amount - $this->paid_amount - ($this->refunded_amount ?? 0);
     }
 
-    /**
-     * Recompute recovery_percentage (paid_amount / total_amount) on the
-     * in-memory model. Callers are expected to ->save() afterward - this
-     * doesn't persist by itself so it composes with addPayment()-style flows
-     * that set several fields before one final save.
-     */
-    public function updateRecoveryPercentage()
-    {
-        $this->recovery_percentage = $this->total_amount > 0
-            ? round(($this->paid_amount / $this->total_amount) * 100, 2)
-            : 0;
-
-        return $this->recovery_percentage;
-    }
-
     // Accessors
     //
     // Missing until now - every other status-bearing model in this app
     // (Expense, MoneyTransfer, ...) has these, but Sale
-    // never did. resources/views/admin/sales/index.blade.php and the agent
-    // equivalent already reference $sale->status_label/status_color, so the
-    // status badge on every sales list has been rendering blank this whole
-    // time - not a template bug, a missing accessor.
+    // never did. resources/views/admin/sales/index.blade.php already
+    // references $sale->status_label/status_color, so the status badge on
+    // every sales list has been rendering blank this whole time - not a
+    // template bug, a missing accessor.
     public function getStatusLabelAttribute()
     {
         $labels = [
@@ -158,8 +136,8 @@ class Sale extends Model
     }
 
     // Orders placed by a customer through the customer API, still awaiting
-    // an agent/admin to confirm (which is what actually commits stock and
-    // posts ledger entries - see SaleService::applyStockAndAccounting).
+    // an admin to confirm (which is what actually commits stock and posts
+    // ledger entries - see SaleService::applyStockAndAccounting).
     public function scopePendingCustomerOrders($query)
     {
         return $query->where('source', 'customer_app')->where('status', 'draft');
@@ -170,9 +148,9 @@ class Sale extends Model
     {
         return $this->due_amount <= 0;
     }
-    // Agent relationship should use User model
-    public function agent()
+
+    public function location()
     {
-        return $this->belongsTo(User::class, 'agent_id');
+        return $this->belongsTo(Location::class);
     }
 }

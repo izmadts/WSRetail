@@ -121,10 +121,16 @@
                                                 class="w-full px-2 py-1 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
                                                 <option value="">Select Product</option>
                                                 @foreach($products as $product)
-                                                <option value="{{ $product->id }}" data-price="{{ $product->purchase_price }}">
+                                                <option value="{{ $product->id }}" data-price="{{ $product->purchase_price }}" data-has-variants="{{ $product->has_variants ? '1' : '0' }}">
                                                     {{ Str::limit($product->name, 25) }} ({{ $product->code }})
                                                 </option>
                                                 @endforeach
+                                            </select>
+                                            <select x-show="hasVariants(item.product_id)" :name="'items['+index+'][product_variant_id]'" x-model="item.product_variant_id" @change="onVariantChange(index)" class="w-full mt-1 px-2 py-1 text-sm border border-gray-300 rounded-lg bg-white">
+                                                <option value="">Select Variant</option>
+                                                <template x-for="v in variantsFor(item.product_id)" :key="v.id">
+                                                    <option :value="v.id" x-text="v.label"></option>
+                                                </template>
                                             </select>
                                             <p class="mt-1 text-xs text-orange-600" x-show="overCost(item)">
                                                 <i class="fas fa-exclamation-triangle mr-1"></i>Well above last cost (Rs. <span x-text="item.expectedCost"></span>)
@@ -241,10 +247,16 @@
                                             class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
                                             <option value="">Select Product</option>
                                             @foreach($products as $product)
-                                            <option value="{{ $product->id }}" data-price="{{ $product->purchase_price }}">
+                                            <option value="{{ $product->id }}" data-price="{{ $product->purchase_price }}" data-has-variants="{{ $product->has_variants ? '1' : '0' }}">
                                                 {{ $product->name }} ({{ $product->code }})
                                             </option>
                                             @endforeach
+                                        </select>
+                                        <select x-show="hasVariants(item.product_id)" :name="'items['+index+'][product_variant_id]'" x-model="item.product_variant_id" @change="onVariantChange(index)" class="w-full mt-1 px-2 py-1.5 text-sm border border-gray-300 rounded-lg bg-white">
+                                            <option value="">Select Variant</option>
+                                            <template x-for="v in variantsFor(item.product_id)" :key="v.id">
+                                                <option :value="v.id" x-text="v.label"></option>
+                                            </template>
                                         </select>
                                         <p class="mt-1 text-xs text-orange-600" x-show="overCost(item)">
                                             <i class="fas fa-exclamation-triangle mr-1"></i>Well above last cost (Rs. <span x-text="item.expectedCost"></span>)
@@ -338,6 +350,7 @@ function purchaseForm() {
         $itemsJson = $purchase->items->map(function($item) {
             return [
                 'product_id' => $item->product_id,
+                'product_variant_id' => $item->product_variant_id,
                 'quantity' => (float) $item->quantity,
                 'unit_price' => (float) $item->unit_price,
                 'discount' => (float) $item->discount,
@@ -346,8 +359,9 @@ function purchaseForm() {
             ];
         })->toJson();
     @endphp
-    
+
     const existingItems = {!! $itemsJson !!};
+    const productVariants = @json($productVariants);
 
     return {
         items: existingItems.length > 0 ? existingItems : [],
@@ -368,6 +382,7 @@ function purchaseForm() {
         addRow() {
             this.items.push({
                 product_id: '',
+                product_variant_id: '',
                 quantity: 1,
                 unit_price: 0,
                 discount: 0,
@@ -376,6 +391,14 @@ function purchaseForm() {
                 expectedCost: null
             });
             this.calculateTotals();
+        },
+
+        hasVariants(productId) {
+            return !!(productVariants[productId] && productVariants[productId].length);
+        },
+
+        variantsFor(productId) {
+            return productVariants[productId] || [];
         },
 
         removeRow(index) {
@@ -388,11 +411,28 @@ function purchaseForm() {
         onProductChange(index, event) {
             const option = event.target.selectedOptions[0];
             const item = this.items[index];
-            if (option && option.value) {
+            item.product_variant_id = '';
+            if (option && option.value && option.dataset.hasVariants !== '1') {
                 const price = parseFloat(option.dataset.price) || 0;
                 item.unit_price = price;
                 item.expectedCost = price;
+            } else if (option && option.dataset.hasVariants === '1') {
+                item.unit_price = 0;
+                item.expectedCost = null;
             } else {
+                item.expectedCost = null;
+            }
+            this.calculateRow(index);
+        },
+
+        onVariantChange(index) {
+            const item = this.items[index];
+            const variant = (productVariants[item.product_id] || []).find(v => v.id == item.product_variant_id);
+            if (variant) {
+                item.unit_price = variant.purchase_price;
+                item.expectedCost = variant.purchase_price;
+            } else {
+                item.unit_price = 0;
                 item.expectedCost = null;
             }
             this.calculateRow(index);

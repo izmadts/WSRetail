@@ -45,6 +45,18 @@
                         <span class="text-gray-500">Unit</span>
                         <span class="font-medium">{{ $product->unit }}</span>
                     </div>
+                    @if($product->has_variants)
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">Variants</span>
+                        <span class="font-medium">{{ $product->variants->count() }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">Total Stock</span>
+                        <span class="font-medium {{ $product->isLowStock() ? 'text-red-600' : 'text-green-600' }}">
+                            {{ number_format($product->totalStock(), 2) }} {{ $product->unit }}
+                        </span>
+                    </div>
+                    @else
                     <div class="flex justify-between">
                         <span class="text-gray-500">Purchase Price</span>
                         <span class="font-medium">Rs. {{ number_format($product->purchase_price, 2) }}</span>
@@ -77,6 +89,7 @@
                         <span class="font-medium">{{ $product->barcode }}</span>
                     </div>
                     @endif
+                    @endif
                 </div>
                 @if($product->description)
                 <div class="mt-3 p-3 bg-gray-50 rounded-lg">
@@ -101,6 +114,50 @@
 
     <!-- Right Column - Stock Movements -->
     <div class="lg:col-span-2 space-y-6">
+        @if($product->has_variants)
+        <div class="bg-white rounded-xl shadow-card overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h4 class="font-semibold text-gray-900">
+                    <i class="fas fa-layer-group text-gray-400 mr-2"></i> Variants ({{ $product->variants->count() }})
+                </h4>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-gray-50 text-gray-500 text-xs uppercase">
+                        <tr>
+                            <th class="text-left py-2 px-3">Variant</th>
+                            <th class="text-left py-2 px-3">SKU</th>
+                            <th class="text-left py-2 px-3">Barcode</th>
+                            <th class="text-right py-2 px-3">Purchase</th>
+                            <th class="text-right py-2 px-3">Sale</th>
+                            <th class="text-right py-2 px-3">Wholesale</th>
+                            <th class="text-right py-2 px-3">Stock</th>
+                            <th class="text-center py-2 px-3">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                        @foreach($product->variants as $variant)
+                        <tr class="hover:bg-gray-50">
+                            <td class="py-2 px-3 font-medium">{{ $variant->label }}</td>
+                            <td class="py-2 px-3 font-mono text-xs text-gray-600">{{ $variant->sku }}</td>
+                            <td class="py-2 px-3 font-mono text-xs text-gray-600">{{ $variant->barcode ?? '-' }}</td>
+                            <td class="py-2 px-3 text-right">Rs. {{ number_format($variant->purchase_price, 2) }}</td>
+                            <td class="py-2 px-3 text-right">Rs. {{ number_format($variant->sale_price, 2) }}</td>
+                            <td class="py-2 px-3 text-right">Rs. {{ number_format($variant->wholesale_price, 2) }}</td>
+                            <td class="py-2 px-3 text-right {{ $variant->isLowStock() ? 'text-red-600 font-medium' : '' }}">{{ number_format($variant->current_stock, 2) }}</td>
+                            <td class="py-2 px-3 text-center">
+                                <span class="px-2 py-0.5 rounded-full text-xs font-medium {{ $variant->is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600' }}">
+                                    {{ $variant->is_active ? 'Active' : 'Inactive' }}
+                                </span>
+                            </td>
+                        </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        @endif
+
         <!-- Stock Movements -->
         <div class="bg-white rounded-xl shadow-card overflow-hidden">
             <div class="px-6 py-4 border-b border-gray-200">

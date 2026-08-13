@@ -452,66 +452,6 @@ class ReportController extends Controller
     }
 
     // =============================================
-    // 6. AGENT REPORTS (Admin View)
-    // =============================================
-
-    public function agents(Request $request)
-    {
-        $query = User::where('role', 'sales_agent');
-
-        if ($request->status && $request->status != 'all') {
-            $query->where('is_active', $request->status == 'active');
-        }
-
-        $agents = $query->withCount('sales')->get();
-
-        foreach ($agents as $agent) {
-            $agent->total_sales = $agent->sales()->whereIn('status', ['confirmed', 'partial', 'paid'])->sum('total_amount');
-            // Sums AgentCommissionLog, not Sale.commission_amount - the log
-            // is what the agent's own dashboard/report already reads, and
-            // it (unlike the sum of Sale.commission_amount) also captures
-            // new-customer/recovery/target bonuses and return clawbacks.
-            // Summing the sale column instead was showing admins a lower
-            // total-commission figure than the agent saw for themselves.
-            $agent->total_commission = $agent->commissionLogs()->sum('amount');
-            $agent->total_customers = $agent->customers()->count();
-        }
-
-        return view('admin.reports.agents', compact('agents'));
-    }
-
-    public function agentDetail($id)
-    {
-        $user = User::findOrFail($id);
-
-        if ($user->role != 'sales_agent') {
-            abort(404, 'Agent not found!');
-        }
-
-      // Check if user is actually an agent
-        if ($user->role != 'sales_agent') {
-            abort(404, 'Agent not found!');
-        }
-
-        // Load relationships
-        $user->load(['sales' => function ($q) {
-            $q->orderBy('created_at', 'desc')->limit(20);
-        }, 'customers', 'commissionLogs']);
-
-        // Calculate totals
-        $totalSales = $user->sales()->whereIn('status', ['confirmed', 'partial', 'paid'])->sum('total_amount');
-        $totalCommission = $user->commissionLogs()->sum('amount');
-        $totalCustomers = $user->customers()->count();
-
-        return view('admin.reports.agent-detail', compact(
-            'user',
-            'totalSales',
-            'totalCommission',
-            'totalCustomers'
-        ));
-    }
-
-    // =============================================
     // 7. DAILY SUMMARY REPORT
     // =============================================
 

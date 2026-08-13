@@ -103,7 +103,7 @@
                             @foreach($purchase->items as $item)
                             <tr>
                                 <td class="py-2 px-2">
-                                    <span class="font-medium text-gray-900">{{ $item->product->name ?? 'N/A' }}</span>
+                                    <span class="font-medium text-gray-900">{{ $item->product->name ?? 'N/A' }}{{ $item->variant ? ' (' . $item->variant->label . ')' : '' }}</span>
                                     <span class="text-xs text-gray-500 block">{{ $item->product->code ?? '' }}</span>
                                 </td>
                                 <td class="py-2 px-2 text-right">{{ number_format($item->quantity, 2) }}</td>

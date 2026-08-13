@@ -9,9 +9,8 @@ use Illuminate\Support\Facades\Auth;
 
 /**
  * The manager/admin side of the leave workflow - reviewing and
- * approving/rejecting requests submitted by anyone (self-service from
- * either the admin panel's "My Leave" or the Agent portal's "Leave" both
- * write to the same leave_requests table, so this one queue covers both).
+ * approving/rejecting requests submitted via the admin panel's "My Leave"
+ * self-service page (writes to the same leave_requests table this reads).
  */
 class LeaveRequestController extends Controller
 {

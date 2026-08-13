@@ -7,7 +7,6 @@ use App\Models\Customer;
 use App\Models\CustomerGroup;
 use App\Models\CustomerPayment;
 use App\Models\Expense;
-use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -15,15 +14,14 @@ class CustomerController extends Controller
 {
     public function index()
     {
-        $customers = Customer::with('createdByAgent', 'customerGroup')->withCount('sales')->orderBy('name')->get();
+        $customers = Customer::with('customerGroup')->withCount('sales')->orderBy('name')->get();
         return view('admin.customers.index', compact('customers'));
     }
 
     public function create()
     {
-        $agents = User::where('role', 'sales_agent')->where('is_active', true)->whereNotNull('approved_at')->orderBy('name')->get();
         $customerGroups = CustomerGroup::active()->orderBy('name')->get();
-        return view('admin.customers.create', compact('agents', 'customerGroups'));
+        return view('admin.customers.create', compact('customerGroups'));
     }
 
     public function store(Request $request)
@@ -46,7 +44,6 @@ class CustomerController extends Controller
             'credit_days' => 'nullable|integer|min:0',
             'notes' => 'nullable|string',
             'is_active' => 'boolean',
-            'created_by_agent_id' => 'nullable|exists:users,id',
             'customer_group_id' => 'nullable|exists:customer_groups,id',
         ]);
 
@@ -54,11 +51,6 @@ class CustomerController extends Controller
         $validated['opening_balance'] = $validated['opening_balance'] ?? 0;
         $validated['credit_limit'] = $validated['credit_limit'] ?? 0;
         $validated['credit_days'] = $validated['credit_days'] ?? 0;
-        if (!empty($validated['created_by_agent_id'])) {
-            $validated['is_agent_customer'] = true;
-        } else {
-            $validated['is_agent_customer'] = false;
-        }
         $customer = Customer::create($validated);
         $customer->postOpeningBalance();
 
@@ -78,9 +70,8 @@ class CustomerController extends Controller
 
     public function edit(Customer $customer)
     {
-        $agents = User::where('role', 'sales_agent')->where('is_active', true)->whereNotNull('approved_at')->orderBy('name')->get();
         $customerGroups = CustomerGroup::active()->orderBy('name')->get();
-        return view('admin.customers.edit', compact('customer', 'agents', 'customerGroups'));
+        return view('admin.customers.edit', compact('customer', 'customerGroups'));
     }
 
     public function update(Request $request, Customer $customer)
@@ -103,16 +94,10 @@ class CustomerController extends Controller
             'credit_days' => 'nullable|integer|min:0',
             'notes' => 'nullable|string',
             'is_active' => 'boolean',
-            'created_by_agent_id' => 'nullable|exists:users,id',
             'customer_group_id' => 'nullable|exists:customer_groups,id',
         ]);
 
         $validated['is_active'] = $validated['is_active'] ?? false;
-        if (!empty($validated['created_by_agent_id'])) {
-            $validated['is_agent_customer'] = true;
-        } else {
-            $validated['is_agent_customer'] = false;
-        }
 
         $customer->update($validated);
         $customer->postOpeningBalance();

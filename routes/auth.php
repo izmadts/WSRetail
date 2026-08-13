@@ -19,12 +19,9 @@ use Illuminate\Support\Facades\Route;
 // auto-logged-in admin account with full system access. Confirmed live
 // against a throwaway copy before this fix: role=admin, is_active=true,
 // isAdmin()=true, immediately redirected into /dashboard already
-// authenticated. This app has no legitimate use for open self-registration
-// anyway - admin/staff accounts are created by an existing admin (Settings
-// > Users), and the only self-service signup that should exist is the
-// deliberately-gated one at routes/web.php's 'agent/register'
-// (AgentRegistrationController - hardcodes role=sales_agent and
-// is_active=false pending admin approval, unlike this one).
+// authenticated. This app has no self-service signup at all - every
+// account (admin/manager/accountant/pos_manager) is created by an
+// existing admin (Settings > Users).
 Route::middleware('guest')->group(function () {
     Route::get('login', [AuthenticatedSessionController::class, 'create'])
         ->name('login');

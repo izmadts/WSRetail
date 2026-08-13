@@ -21,6 +21,12 @@
                 </p>
             </div>
 
+            @if(($demoMode ?? false) && !empty($demoCredentialsNote))
+            <div class="rounded-xl bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 text-sm text-center">
+                <i class="fas fa-info-circle mr-1"></i> This is a demo. {{ $demoCredentialsNote }}
+            </div>
+            @endif
+
             <!-- Login Form -->
             <div class="bg-white rounded-2xl shadow-xl p-8">
                 <form method="POST" action="{{ route('login') }}">
@@ -80,19 +86,6 @@
                         <i class="fas fa-sign-in-alt mr-2"></i> Sign In
                     </button>
                 </form>
-
-                <!-- Register Link - points at the gated sales-agent application
-                     flow (approval required before the account can log in),
-                     not open self-registration - see routes/auth.php for why
-                     that no longer exists. -->
-                <div class="mt-6 text-center">
-                    <p class="text-sm text-gray-600">
-                        Want to become a sales agent?
-                        <a href="{{ route('agent.register') }}" class="text-blue-600 hover:text-blue-800 font-medium">
-                            Apply here
-                        </a>
-                    </p>
-                </div>
             </div>
         </div>
     </div>

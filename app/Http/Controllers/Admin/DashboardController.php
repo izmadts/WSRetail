@@ -10,7 +10,6 @@ use App\Models\Sale;
 use App\Models\Purchase;
 use App\Models\Customer;
 use App\Models\Supplier;
-use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -63,8 +62,6 @@ class DashboardController extends Controller
 
         $totalCustomers = Customer::count();
         $activeCustomers = Customer::where('is_active', true)->count();
-        $totalAgents = User::where('role', 'sales_agent')->count();
-        $activeAgents = User::where('role', 'sales_agent')->where('is_active', true)->whereNotNull('approved_at')->count();
 
         // =============================================
         // CHART DATA: Monthly Sales & Purchases (Last 12 Months)
@@ -149,8 +146,6 @@ class DashboardController extends Controller
             'currentMonthPurchases' => $currentMonthPurchases,
             'totalCustomers' => $totalCustomers,
             'activeCustomers' => $activeCustomers,
-            'totalAgents' => $totalAgents,
-            'activeAgents' => $activeAgents,
             'months' => $months,
             'monthlySales' => $monthlySales,
             'monthlyPurchases' => $monthlyPurchases,

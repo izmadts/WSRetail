@@ -3,8 +3,8 @@
 namespace App\Http\Traits;
 
 /**
- * One consistent JSON envelope for every Sale Agent API response, so the
- * Flutter client can parse success/error the same way regardless of which
+ * One consistent JSON envelope for every Customer API response, so a
+ * client can parse success/error the same way regardless of which
  * endpoint it called. See the API documentation page (Settings > System >
  * API Documentation) for the exact shape.
  */

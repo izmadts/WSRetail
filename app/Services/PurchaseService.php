@@ -199,17 +199,30 @@ class PurchaseService
     // INTERNAL HELPERS
     // =============================================
 
+    /**
+     * A variant line item's stock lives on the ProductVariant row, not the
+     * parent Product - resolves and locks whichever one actually holds the
+     * quantity for this item.
+     */
+    private function stockableFor($item)
+    {
+        return $item->product_variant_id
+            ? \App\Models\ProductVariant::where('id', $item->product_variant_id)->lockForUpdate()->first()
+            : Product::where('id', $item->product_id)->lockForUpdate()->first();
+    }
+
     private function updateStock(Purchase $purchase)
     {
         foreach ($purchase->items as $item) {
             // Locked for the duration of the enclosing transaction so a
             // concurrent sale/return of the same product can't interleave
             // with this read-modify-write and lose an update.
-            $product = Product::where('id', $item->product_id)->lockForUpdate()->first();
-            if ($product) {
-                $product->current_stock += $item->quantity;
-                $product->save();
-                Log::info("Stock increased for product: {$product->name} (+{$item->quantity})");
+            $stockable = $this->stockableFor($item);
+            if ($stockable) {
+                $stockable->current_stock += $item->quantity;
+                $stockable->save();
+                $label = $item->product_variant_id ? $stockable->label : $stockable->name;
+                Log::info("Stock increased for product: {$label} (+{$item->quantity})");
             }
         }
     }
@@ -217,14 +230,15 @@ class PurchaseService
     private function reverseStock(Purchase $purchase)
     {
         foreach ($purchase->items as $item) {
-            $product = Product::where('id', $item->product_id)->lockForUpdate()->first();
-            if ($product) {
-                if ($product->current_stock < $item->quantity) {
-                    throw new \Exception("Cannot reverse purchase: would take {$product->name}'s stock negative (some of it may have already been sold or moved).");
+            $stockable = $this->stockableFor($item);
+            if ($stockable) {
+                $label = $item->product_variant_id ? $stockable->label : $stockable->name;
+                if ($stockable->current_stock < $item->quantity) {
+                    throw new \Exception("Cannot reverse purchase: would take {$label}'s stock negative (some of it may have already been sold or moved).");
                 }
-                $product->current_stock -= $item->quantity;
-                $product->save();
-                Log::info("Stock reversed for product: {$product->name} (-{$item->quantity})");
+                $stockable->current_stock -= $item->quantity;
+                $stockable->save();
+                Log::info("Stock reversed for product: {$label} (-{$item->quantity})");
             }
         }
     }
@@ -232,12 +246,15 @@ class PurchaseService
     private function createStockMovements(Purchase $purchase)
     {
         foreach ($purchase->items as $item) {
-            $product = Product::find($item->product_id);
-            if ($product) {
-                $stockBefore = $product->current_stock - $item->quantity;
+            $stockable = $item->product_variant_id
+                ? \App\Models\ProductVariant::find($item->product_variant_id)
+                : Product::find($item->product_id);
+            if ($stockable) {
+                $stockBefore = $stockable->current_stock - $item->quantity;
 
                 StockMovement::create([
-                    'product_id' => $product->id,
+                    'product_id' => $item->product_id,
+                    'product_variant_id' => $item->product_variant_id,
                     'type' => 'in',
                     'reference_type' => 'purchase',
                     'reference_id' => $purchase->id,
@@ -245,7 +262,7 @@ class PurchaseService
                     'unit_price' => $item->unit_price,
                     'total_price' => $item->total_price,
                     'stock_before' => $stockBefore,
-                    'stock_after' => $product->current_stock,
+                    'stock_after' => $stockable->current_stock,
                     'notes' => "Purchase #{$purchase->invoice_no}" . ($purchase->supplier ? " - Supplier: {$purchase->supplier->name}" : ''),
                 ]);
             }

@@ -1,4 +1,8 @@
-# Deploying WSERP to a live server
+# Deploying WSRetail to a live server
+
+This covers the SSH/CLI path. If your host only gives you cPanel with no
+shell access, use the step-by-step cPanel guide in [README.md](README.md)
+instead - both end up at the same `/install` wizard.
 
 ## 1. Get the code onto the server
 
@@ -31,41 +35,41 @@ root) - same as any Laravel app.
 ## 3. Finish setup in the browser
 
 Visit your domain. Since nothing is installed yet, it redirects you straight
-to `/install` - a 2-step wizard:
+to `/install` - a short wizard:
 
 1. **Database** - host/port/name/username/password. It tests the connection
    before letting you continue.
-2. **Admin & Company** - your real admin login (name/email/password) and
-   company name/logo/phone/address.
+2. **Admin, company & license** - your real admin login (name/email/password),
+   company name/logo/phone/address, and your license key (see
+   [Licensing](README.md#licensing) in the README if you don't have one yet).
 
-Submitting step 2 runs the migrations, seeds structural defaults (chart of
-accounts, product/expense/income categories, customer groups, and
-commission policy defaults, role permissions - **never** demo/test data),
-creates your admin account, saves your company settings, and writes
-`storage/installed` so the wizard can't be run again by accident. From there
-you're redirected to a completion page and can log in.
+Submitting the final step runs the migrations, seeds structural defaults
+(chart of accounts, product/expense/income categories, customer groups, role
+permissions - **never** demo/test data), creates your admin account, saves
+your company settings, activates your license, and writes `storage/installed`
+so the wizard can't be run again by accident. From there you're redirected to
+a completion page and can log in.
 
 To re-run the wizard later (e.g. a full reset), delete `storage/installed`
 on the server - this does **not** touch any existing data by itself, it just
 unlocks the wizard again.
 
-## 4. Update the mobile apps' API base URLs - not automatic
+## 4. Connect a storefront (optional)
 
-WSERP's own `APP_URL` is set automatically during step 2 (detected from
-whatever domain you visited to run the wizard) - nothing to do there. The
-Flutter apps are separate codebases with their own hardcoded dev URLs that
-**do not update themselves** and must be changed by hand before a release
-build:
+If you're also deploying the companion Next.js storefront
+(`wsretail-storefront`) so customers can shop online:
 
-| App | File | What to change |
-|---|---|---|
-| `izmafood-vendors` (Mandi/seller app) | `lib/config/wserp_constants.dart` | `kWserpBaseUrlFallback` -> your real domain + `/api/v1/customer`; `kWserpIntegrationKeyFallback` -> must match `CUSTOMER_API_INTEGRATION_KEY` in WSERP's `.env` on the live server (rotate it there for production, don't ship the dev value) |
-| `izmafood_saleagent` (sales agent app) | `lib/services/api_client.dart` | `ApiClient.baseUrl` -> your real domain + `/api/v1/agent` |
-| `izmafood-vendors` (existing izmafood.com integration) | `lib/config/constants.dart` | `kBaseApiUrl` - already production (`https://izmafood.com/api/`), no change needed |
+- Deploy the storefront separately (its own subdomain or the main domain -
+  see that repo's own README for its cPanel "Setup Node.js App" steps).
+- In WSRetail, go to **System > API Documentation** to get the Customer API
+  base URL and generate/copy `CUSTOMER_API_INTEGRATION_KEY` from `.env`.
+- In the storefront's environment, set `WSRETAIL_API_URL` and
+  `WSRETAIL_INTEGRATION_KEY` to match - see the storefront's
+  `.env.local.example`.
 
-Both apps also support overriding via a bundled `.env` (`flutter_dotenv`) if
-you'd rather not hardcode the production values into source - see each
-constants file's fallback pattern.
+The two apps talk to each other purely over HTTPS via that API; no shared
+filesystem or database access is needed, so they can live on completely
+different domains/servers.
 
 ## 5. Recommended follow-ups (not automated by the wizard)
 

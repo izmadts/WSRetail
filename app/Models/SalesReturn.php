@@ -93,10 +93,7 @@ class SalesReturn extends Model
             // 3. Reverse accounting entries
             $this->reverseAccounting();
 
-            // 4. Reverse agent commission
-            $this->reverseCommission();
-
-            // 5. Reduce what's owed on the original sale by the returned amount
+            // 4. Reduce what's owed on the original sale by the returned amount
             $this->applyToSale();
         });
     }
@@ -139,9 +136,8 @@ class SalesReturn extends Model
                 ->delete();
 
             // 4. Put back what this return had taken off the original sale's
-            // owed amount, and restore the commission it had clawed back.
+            // owed amount.
             $this->removeFromSale();
-            app(\App\Services\CommissionService::class)->restoreSaleReturnCommission($this);
         });
     }
 
@@ -313,19 +309,6 @@ class SalesReturn extends Model
         }
 
         $this->postDoubleEntry($entries, 'sales_return', $this->id, $this->return_date);
-    }
-
-    /**
-     * Reverse agent commission proportional to this return, via
-     * CommissionService (which uses the sale's own recorded
-     * commission_amount as the basis rather than trying to re-derive a
-     * rate from User columns that don't exist - commission_type/
-     * commission_rate were copy-pasted from a since-deleted, unrelated
-     * Agent model that never had a real database table).
-     */
-    private function reverseCommission()
-    {
-        app(\App\Services\CommissionService::class)->reverseSaleReturnCommission($this);
     }
 
     // =============================================

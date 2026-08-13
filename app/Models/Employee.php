@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * - Linked employees (user_id set): auto-created the moment a matching
  *   User row is created (see User::booted()'s created/updated hooks) -
  *   covers everyone who already logs into the software (admin, manager,
- *   accountant, sales_agent).
+ *   accountant, pos_manager).
  * - Standalone employees (user_id null): added directly through this HR
  *   module for staff who never log in at all (warehouse, delivery, other
  *   operational/supply-chain roles). Can be retroactively linked later via
@@ -120,8 +120,8 @@ class Employee extends Model
 
     /**
      * Keep the linked Employee's active/approval state in step with the
-     * User it was auto-created from (e.g. an agent's pending -> approved
-     * transition, or an admin deactivating a staff login).
+     * User it was auto-created from (e.g. an admin deactivating a staff
+     * login).
      */
     public function syncFromUser(User $user): void
     {

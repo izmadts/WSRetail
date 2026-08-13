@@ -2,10 +2,11 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\DashboardController;
-use App\Http\Controllers\Auth\AgentRegistrationController;
+use App\Http\Controllers\Admin\LicenseController;
 use App\Http\Controllers\Admin\AccountController;
 use App\Http\Controllers\Admin\CategoryController;
 use App\Http\Controllers\Admin\ProductController;
+use App\Http\Controllers\Admin\ProductAttributeController;
 use App\Http\Controllers\Admin\PurchaseController;
 use App\Http\Controllers\Admin\SupplierController;
 use App\Http\Controllers\Admin\CustomerController;
@@ -29,6 +30,9 @@ use App\Http\Controllers\Admin\ActivityLogController;
 use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\Admin\ApiSystemController;
 use App\Http\Controllers\Admin\CustomerGroupController;
+use App\Http\Controllers\Admin\LocationController;
+use App\Http\Controllers\Admin\PosSettingController;
+use App\Http\Controllers\Admin\BarcodeController;
 use App\Http\Controllers\Admin\StaffUserController;
 use App\Http\Controllers\Admin\RolePermissionController;
 use App\Http\Controllers\Admin\EmployeeController;
@@ -41,19 +45,6 @@ use App\Http\Controllers\Admin\PayrollController;
 use App\Http\Controllers\Admin\MyPayslipController;
 use App\Http\Controllers\Admin\GuideController;
 use App\Http\Controllers\Admin\QuickSearchController;
-
-// Agent Controllers
-use App\Http\Controllers\Agent\DashboardController as AgentDashboardController;
-use App\Http\Controllers\Agent\CustomerController as AgentCustomerController;
-use App\Http\Controllers\Agent\SaleController as AgentSaleController;
-use App\Http\Controllers\Agent\CommissionController as AgentCommissionController;
-use App\Http\Controllers\Agent\ReportController as AgentReportController;
-use App\Http\Controllers\Agent\ProfileController as AgentProfileController;
-use App\Http\Controllers\Agent\LeaveController as AgentLeaveController;
-use App\Http\Controllers\Agent\PayslipController as AgentPayslipController;
-
-// Admin Agent Management
-use App\Http\Controllers\Admin\AgentManagementController;
 
 /*
 |--------------------------------------------------------------------------
@@ -77,28 +68,32 @@ Route::get('/', function () {
     return redirect()->route('login');
 });
 
-// Agent Registration
-Route::middleware(['throttle:6,1'])->group(function () {
-    Route::get('/agent/register', [AgentRegistrationController::class, 'showRegistrationForm'])->name('agent.register');
-    Route::post('/agent/register', [AgentRegistrationController::class, 'register'])->name('agent.register.post');
-});
-Route::get('/agent/register/success', [AgentRegistrationController::class, 'showSuccess'])->name('agent.register.success');
-Route::get('/agent/policy', function () {
-    return view('auth.agent-policy');
-})->name('agent.policy');
-
 // Auth routes (Laravel Breeze)
 require __DIR__ . '/auth.php';
 
 // ============================================
 // ADMIN ROUTES - Protected with Auth
 // ============================================
-Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin,manager,accountant', 'log.activity'])->group(function () {
+Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin,manager,accountant,pos_manager', 'log.activity', 'license'])->group(function () {
 
     // ==========================================
     // 1. DASHBOARD
     // ==========================================
     Route::get('/dashboard', [DashboardController::class, 'index'])->middleware('permission:dashboard,view')->name('dashboard');
+
+    // License management - reachable regardless of lock state (see the
+    // `license` middleware / EnsureLicensed), so a locked-out admin can
+    // always fix it. Viewing status needs no role check; activating/
+    // deactivating/rechecking is gated to role=admin inside the controller.
+    Route::prefix('license')->name('license.')->group(function () {
+        Route::get('/', [LicenseController::class, 'index'])->name('index');
+        Route::post('/activate', [LicenseController::class, 'activate'])->name('activate');
+        Route::post('/recheck', [LicenseController::class, 'recheck'])->name('recheck');
+        Route::post('/deactivate', [LicenseController::class, 'deactivate'])->name('deactivate');
+        Route::post('/purchase-request', [LicenseController::class, 'purchaseRequest'])
+            ->middleware('throttle:5,1')
+            ->name('purchase-request');
+    });
 
     // Ctrl/Cmd+K quick search palette - no permission: middleware here since
     // it aggregates several modules at once; QuickSearchController filters
@@ -141,11 +136,24 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin,manager,
         Route::get('/create', [ProductController::class, 'create'])->middleware('permission:products,create')->name('create');
         Route::post('/', [ProductController::class, 'store'])->middleware('permission:products,create')->name('store');
         Route::get('/low-stock', [ProductController::class, 'lowStock'])->name('low-stock');
+        Route::prefix('barcode')->name('barcode.')->group(function () {
+            Route::get('/', [BarcodeController::class, 'index'])->name('index');
+            Route::post('/print', [BarcodeController::class, 'print'])->name('print');
+        });
         Route::get('/{product}', [ProductController::class, 'show'])->name('show');
         Route::get('/{product}/edit', [ProductController::class, 'edit'])->middleware('permission:products,edit')->name('edit');
         Route::put('/{product}', [ProductController::class, 'update'])->middleware('permission:products,edit')->name('update');
         Route::delete('/{product}', [ProductController::class, 'destroy'])->middleware('permission:products,delete')->name('destroy');
         Route::post('/{product}/toggle-status', [ProductController::class, 'toggleStatus'])->middleware('permission:products,edit')->name('toggle-status');
+    });
+
+    // Product variant attributes (Size, Color, ...) - reusable across
+    // products, managed here or quick-added inline from the product form.
+    Route::prefix('product-attributes')->name('product-attributes.')->middleware('permission:products,view')->group(function () {
+        Route::get('/', [ProductAttributeController::class, 'index'])->name('index');
+        Route::get('/data', [ProductAttributeController::class, 'data'])->name('data');
+        Route::post('/', [ProductAttributeController::class, 'store'])->middleware('permission:products,create')->name('store');
+        Route::post('/{productAttribute}/values', [ProductAttributeController::class, 'storeValue'])->middleware('permission:products,create')->name('values.store');
     });
 
     // ==========================================
@@ -222,29 +230,6 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin,manager,
         Route::post('/{customer}/payments', [CustomerController::class, 'makePayment'])->middleware('permission:customers,edit')->name('payments.store');
         Route::put('/{customer}/payments/{payment}', [CustomerController::class, 'updatePayment'])->middleware('permission:customers,edit')->name('payments.update');
         Route::delete('/{customer}/payments/{payment}', [CustomerController::class, 'deletePayment'])->middleware('permission:customers,delete')->name('payments.destroy');
-    });
-
-    // ==========================================
-    // 10. AGENT MANAGEMENT (Admin)
-    // ==========================================
-    Route::prefix('agents')->name('agents.')->middleware('permission:agents,view')->group(function () {
-        Route::get('/', [AgentManagementController::class, 'index'])->name('index');
-        Route::get('/pending', [AgentManagementController::class, 'pending'])->name('pending');
-        Route::get('/create', [AgentManagementController::class, 'create'])->middleware('permission:agents,create')->name('create');
-        Route::post('/', [AgentManagementController::class, 'store'])->middleware('permission:agents,create')->name('store');
-        Route::get('/{user}/approve', [AgentManagementController::class, 'approve'])->middleware('permission:agents,edit')->name('approve');
-        Route::post('/{user}/approve', [AgentManagementController::class, 'doApprove'])->middleware('permission:agents,edit')->name('do-approve');
-        Route::get('/{user}/reject', [AgentManagementController::class, 'reject'])->middleware('permission:agents,edit')->name('reject');
-        Route::post('/{user}/reject', [AgentManagementController::class, 'doReject'])->middleware('permission:agents,edit')->name('do-reject');
-        Route::get('/{user}', [AgentManagementController::class, 'view'])->name('view');
-        Route::get('/{user}/edit', [AgentManagementController::class, 'edit'])->middleware('permission:agents,edit')->name('edit');
-        Route::put('/{user}', [AgentManagementController::class, 'update'])->middleware('permission:agents,edit')->name('update');
-        Route::delete('/{user}', [AgentManagementController::class, 'destroy'])->middleware('permission:agents,delete')->name('destroy');
-        Route::post('/{user}/toggle-status', [AgentManagementController::class, 'toggleStatus'])->middleware('permission:agents,edit')->name('toggle-status');
-        Route::post('/{user}/pay-commission', [AgentManagementController::class, 'payCommission'])->middleware('permission:agents,edit')->name('pay-commission');
-        Route::post('/{user}/sales/{sale}/hold-commission', [AgentManagementController::class, 'holdCommission'])->middleware('permission:agents,edit')->name('hold-commission');
-        Route::post('/{user}/sales/{sale}/release-commission', [AgentManagementController::class, 'releaseCommission'])->middleware('permission:agents,edit')->name('release-commission');
-        Route::post('/close-month', [AgentManagementController::class, 'closeMonth'])->middleware('permission:agents,edit')->name('close-month');
     });
 
     // ==========================================
@@ -328,15 +313,17 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin,manager,
     Route::prefix('sales')->name('sales.')->middleware('permission:sales,view')->group(function () {
         Route::get('/', [SaleController::class, 'index'])->name('index');
         Route::get('/create', [SaleController::class, 'create'])->middleware('permission:sales,create')->name('create');
+        Route::get('/pos', [SaleController::class, 'pos'])->middleware('permission:sales,create')->name('pos');
         Route::post('/', [SaleController::class, 'store'])->middleware('permission:sales,create')->name('store');
         Route::get('/{sale}', [SaleController::class, 'show'])->name('show');
+        Route::get('/{sale}/receipt', [SaleController::class, 'receipt'])->name('receipt');
         Route::get('/{sale}/edit', [SaleController::class, 'edit'])->middleware('permission:sales,edit')->name('edit');
         Route::put('/{sale}', [SaleController::class, 'update'])->middleware('permission:sales,edit')->name('update');
         Route::delete('/{sale}', [SaleController::class, 'destroy'])->middleware('permission:sales,delete')->name('destroy');
         Route::post('/{sale}/add-payment', [SaleController::class, 'addPayment'])->middleware('permission:sales,edit')->name('add-payment');
         // Confirms/rejects a still-draft sale - how a customer-placed order
-        // (source=customer_app, particularly a "direct"/no-agent one, which
-        // only an admin can act on) becomes a real, ledger-posted sale.
+        // (source=customer_app), which only an admin can act on, becomes a
+        // real, ledger-posted sale.
         Route::post('/{sale}/confirm', [SaleController::class, 'confirm'])->middleware('permission:sales,edit')->name('confirm');
         Route::post('/{sale}/reject', [SaleController::class, 'reject'])->middleware('permission:sales,edit')->name('reject');
     });
@@ -471,10 +458,6 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin,manager,
         Route::get('/expenses', [ReportController::class, 'expenses'])->name('expenses');
         Route::get('/incomes', [ReportController::class, 'incomes'])->name('incomes');
 
-        // Agent Reports
-        Route::get('/agents', [ReportController::class, 'agents'])->name('agents');
-        Route::get('/agent/{user}', [ReportController::class, 'agentDetail'])->name('agent-detail');
-
         // Daily Summary
         Route::get('/daily-summary', [ReportController::class, 'dailySummary'])->name('daily-summary');
 
@@ -531,8 +514,8 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin,manager,
     });
 
     // ==========================================
-    // 21b. SALE AGENT API - Docs & Tester (admin-only: the tester can
-    // perform real create/update/delete calls against live data)
+    // 21b. API - Docs & Tester (admin-only: the tester can perform real
+    // create/update/delete calls against live data)
     // ==========================================
     Route::prefix('system/api')->name('system.api.')->middleware('role:admin')->group(function () {
         Route::get('/docs', [ApiSystemController::class, 'documentation'])->name('docs');
@@ -553,8 +536,8 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin,manager,
         Route::get('/general', [SettingsController::class, 'general'])->name('general');
         Route::post('/general', [SettingsController::class, 'updateGeneral'])->name('general.update');
 
-        Route::get('/commission', [SettingsController::class, 'commission'])->name('commission');
-        Route::post('/commission', [SettingsController::class, 'updateCommission'])->name('commission.update');
+        Route::get('/credit', [SettingsController::class, 'credit'])->name('credit');
+        Route::post('/credit', [SettingsController::class, 'updateCredit'])->name('credit.update');
 
         Route::prefix('customer-groups')->name('customer-groups.')->group(function () {
             Route::get('/', [CustomerGroupController::class, 'index'])->name('index');
@@ -563,6 +546,15 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin,manager,
             Route::get('/{customerGroup}/edit', [CustomerGroupController::class, 'edit'])->name('edit');
             Route::put('/{customerGroup}', [CustomerGroupController::class, 'update'])->name('update');
             Route::delete('/{customerGroup}', [CustomerGroupController::class, 'destroy'])->name('destroy');
+        });
+
+        Route::prefix('locations')->name('locations.')->group(function () {
+            Route::get('/', [LocationController::class, 'index'])->name('index');
+            Route::get('/create', [LocationController::class, 'create'])->name('create');
+            Route::post('/', [LocationController::class, 'store'])->name('store');
+            Route::get('/{location}/edit', [LocationController::class, 'edit'])->name('edit');
+            Route::put('/{location}', [LocationController::class, 'update'])->name('update');
+            Route::delete('/{location}', [LocationController::class, 'destroy'])->name('destroy');
         });
 
         Route::prefix('users')->name('users.')->group(function () {
@@ -576,6 +568,9 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin,manager,
 
         Route::get('/permissions', [RolePermissionController::class, 'index'])->name('permissions.index');
         Route::post('/permissions', [RolePermissionController::class, 'update'])->name('permissions.update');
+
+        Route::get('/pos', [PosSettingController::class, 'edit'])->name('pos.edit');
+        Route::post('/pos', [PosSettingController::class, 'update'])->name('pos.update');
     });
 
     // ==========================================
@@ -591,78 +586,6 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin,manager,
         Route::get('/', [AccountReconciliationController::class, 'index'])->name('index');
         Route::post('/scan', [AccountReconciliationController::class, 'scan'])->name('scan');
         Route::post('/fix', [AccountReconciliationController::class, 'fix'])->name('fix');
-    });
-});
-
-// ============================================
-// AGENT ROUTES (Protected)
-// ============================================
-Route::prefix('agent')->name('agent.')->middleware(['auth'])->group(function () {
-
-    // Only sales agents can access these
-    Route::middleware(['role:sales_agent'])->group(function () {
-
-        // Dashboard
-        Route::get('/dashboard', [AgentDashboardController::class, 'index'])->name('dashboard');
-
-        // Customers (Only agent's own customers)
-        Route::prefix('customers')->name('customers.')->group(function () {
-            Route::get('/', [AgentCustomerController::class, 'index'])->name('index');
-            Route::get('/create', [AgentCustomerController::class, 'create'])->name('create');
-            Route::post('/', [AgentCustomerController::class, 'store'])->name('store');
-            Route::get('/{customer}', [AgentCustomerController::class, 'show'])->name('show');
-            Route::get('/{customer}/edit', [AgentCustomerController::class, 'edit'])->name('edit');
-            Route::put('/{customer}', [AgentCustomerController::class, 'update'])->name('update');
-            Route::delete('/{customer}', [AgentCustomerController::class, 'destroy'])->name('destroy');
-        });
-
-        // Sales (Only agent's own sales)
-        Route::prefix('sales')->name('sales.')->group(function () {
-            Route::get('/', [AgentSaleController::class, 'index'])->name('index');
-            Route::get('/create', [AgentSaleController::class, 'create'])->name('create');
-            Route::post('/', [AgentSaleController::class, 'store'])->name('store');
-            Route::get('/{sale}', [AgentSaleController::class, 'show'])->name('show');
-            Route::get('/{sale}/edit', [AgentSaleController::class, 'edit'])->name('edit');
-            Route::put('/{sale}', [AgentSaleController::class, 'update'])->name('update');
-            Route::delete('/{sale}', [AgentSaleController::class, 'destroy'])->name('destroy');
-            Route::post('/{sale}/add-payment', [AgentSaleController::class, 'addPayment'])->name('add-payment');
-            // Confirms/rejects a still-draft sale - how a customer's order
-            // placed through this agent (source=customer_app) becomes real.
-            Route::post('/{sale}/confirm', [AgentSaleController::class, 'confirm'])->name('confirm');
-            Route::post('/{sale}/reject', [AgentSaleController::class, 'reject'])->name('reject');
-        });
-
-        // Commission & Reports
-        Route::prefix('commissions')->name('commissions.')->group(function () {
-            Route::get('/', [AgentCommissionController::class, 'index'])->name('index');
-            Route::get('/details', [AgentCommissionController::class, 'details'])->name('details');
-        });
-
-        Route::prefix('reports')->name('reports.')->group(function () {
-            Route::get('/', [AgentReportController::class, 'index'])->name('index');
-            Route::get('/sales', [AgentReportController::class, 'sales'])->name('sales');
-            Route::get('/commission', [AgentReportController::class, 'commission'])->name('commission');
-            Route::get('/target', [AgentReportController::class, 'target'])->name('target');
-        });
-
-        // Profile
-        Route::prefix('profile')->name('profile.')->group(function () {
-            Route::get('/', [AgentProfileController::class, 'index'])->name('index');
-            Route::put('/', [AgentProfileController::class, 'update'])->name('update');
-        });
-
-        // Leave (self-service - same leave_requests table/approval queue as the admin panel)
-        Route::prefix('leave')->name('leave.')->group(function () {
-            Route::get('/', [AgentLeaveController::class, 'index'])->name('index');
-            Route::post('/', [AgentLeaveController::class, 'store'])->name('store');
-            Route::post('/{leaveRequest}/cancel', [AgentLeaveController::class, 'cancel'])->name('cancel');
-        });
-
-        // Payslips (self-service view only)
-        Route::prefix('payslips')->name('payslips.')->group(function () {
-            Route::get('/', [AgentPayslipController::class, 'index'])->name('index');
-        });
-
     });
 });
 

@@ -107,16 +107,26 @@
                     <p class="mt-1 text-xs text-gray-500">When enabled, everyone gets a light/dark toggle in the top bar (their own choice, remembered on their own device). When disabled, the toggle is hidden and the panel stays light for everyone.</p>
                 </div>
 
-                <div class="border-t border-gray-200 pt-4">
+                <div class="border-t border-gray-200 pt-4" x-data="{ demo: {{ old('demo_mode', $settings['demo_mode']) ? 'true' : 'false' }} }">
                     <label class="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" name="registration_enabled" value="1"
-                            {{ old('registration_enabled', $settings['registration_enabled']) ? 'checked' : '' }}
-                            class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                        <span class="text-sm font-medium text-gray-700">Allow new sales agent registration</span>
+                        <input type="checkbox" name="demo_mode" value="1" x-model="demo"
+                            class="w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500">
+                        <span class="text-sm font-medium text-gray-700">Demo mode</span>
                     </label>
                     <p class="mt-1 text-xs text-gray-500">
-                        When enabled, anyone can submit a new sales agent application (web form or the mobile app) - they still can't log in until you approve them from Agents. When disabled, the sign-up form/API refuses new applications entirely; existing agents and their logins are completely unaffected either way.
+                        Shows a credentials hint on the login page, e.g. <em>"Demo login: admin@demo.com / admin"</em>.
+                        Only turn this on for a public demo install (like demo.izmadts.com) that visitors are meant
+                        to log into freely - <strong class="text-amber-700">never enable this on a real customer's
+                        live business data.</strong>
                     </p>
+                    <div x-show="demo" x-cloak class="mt-3">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Demo Credentials Text</label>
+                        <input type="text" name="demo_credentials_note" value="{{ old('demo_credentials_note', $settings['demo_credentials_note']) }}"
+                            placeholder="Email: admin@demo.com   Password: admin"
+                            maxlength="255"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500">
+                        <p class="mt-1 text-xs text-gray-500">Shown exactly as typed on the login page. Leave blank to hide the hint even with Demo mode on.</p>
+                    </div>
                 </div>
 
                 <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors duration-200">

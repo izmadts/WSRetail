@@ -13,12 +13,12 @@ class OrderController extends ApiController
 {
     /**
      * Orders placed here are plain Sale rows (source=customer_app,
-     * status=draft) - the same model/table/reports agents and admin
-     * already use, not a separate "order" concept. Nothing is deducted or
-     * posted to the ledger at this point: SaleService::applyStockAndAccounting
+     * status=draft) - the same model/table/reports the admin already
+     * uses, not a separate "order" concept. Nothing is deducted or posted
+     * to the ledger at this point: SaleService::applyStockAndAccounting
      * no-ops for any status other than confirmed/paid, so a draft sale has
-     * zero stock/accounting effect until an agent or admin confirms it
-     * (POST /agent/sales/{id}/confirm or the admin equivalent).
+     * zero stock/accounting effect until an admin confirms it (POST
+     * /admin/sales/{id}/confirm).
      */
     public function index(Request $request)
     {
@@ -49,24 +49,20 @@ class OrderController extends ApiController
     }
 
     /**
-     * The customer (seller-app/Mandi) API is a wholesale-only channel,
-     * full stop - not conditional on customer_group. A customer's
-     * customer_group still exists and still defaults to Wholesale at
-     * /connect (useful for reporting/reconciliation elsewhere in WSERP),
-     * but this endpoint set never consults it: every order here prices and
-     * filters against wholesale_price/is_wholesale, regardless of what an
-     * admin later sets that field to for other purposes. created_by_agent_id
-     * is unrelated to any of this - it only decides commission credit.
+     * The customer/storefront API is a retail-only channel, full stop -
+     * not conditional on customer_group. A customer's customer_group still
+     * exists and still defaults to Retail at /connect (useful for
+     * reporting/reconciliation elsewhere in WSRetail), but this endpoint
+     * set never consults it: every order here prices and filters against
+     * sale_price/is_retail, regardless of what an admin later sets that
+     * field to for other purposes.
      */
     private function resolveChannel()
     {
-        $customer = $this->customer();
-
         return [
-            'agent_id' => $customer->created_by_agent_id,
-            'price_field' => 'wholesale_price',
-            'availability_flag' => 'is_wholesale',
-            'label' => 'wholesale',
+            'price_field' => 'sale_price',
+            'availability_flag' => 'is_retail',
+            'label' => 'retail',
         ];
     }
 
@@ -90,8 +86,7 @@ class OrderController extends ApiController
         $customer = $this->customer();
 
         // Price is resolved server-side from the product record, never
-        // trusted from the app - this endpoint is reachable by any
-        // connected seller, unlike the agent API's internal client.
+        // trusted from the app.
         $itemsData = [];
         $subTotal = 0;
 
@@ -124,10 +119,9 @@ class OrderController extends ApiController
             ];
         }
 
-        $sale = DB::transaction(function () use ($customer, $channel, $validated, $itemsData, $subTotal) {
+        $sale = DB::transaction(function () use ($customer, $validated, $itemsData, $subTotal) {
             $sale = Sale::create([
                 'customer_id' => $customer->id,
-                'agent_id' => $channel['agent_id'],
                 'source' => 'customer_app',
                 'sale_date' => $validated['sale_date'],
                 // Whatever the customer picked at checkout (Cash on
@@ -159,15 +153,15 @@ class OrderController extends ApiController
 
         return $this->success(
             new SaleResource($sale->load('items.product')),
-            'Order placed! It is pending confirmation from ' . ($channel['agent_id'] ? 'your sales agent' : 'the admin') . '.',
+            'Order placed! It is pending confirmation from the admin.',
             201
         );
     }
 
     /**
-     * Only while still pending - once an agent/admin confirms it, stock and
+     * Only while still pending - once an admin confirms it, stock and
      * ledger entries exist and cancelling becomes a real reversal, not a
-     * customer-facing action (contact the agent/admin instead).
+     * customer-facing action (contact the admin instead).
      */
     public function cancel($id)
     {
@@ -178,7 +172,7 @@ class OrderController extends ApiController
         }
 
         if ($sale->status !== 'draft') {
-            return $this->error('This order has already been processed and can no longer be cancelled here - contact your sales agent or the admin.', 422);
+            return $this->error('This order has already been processed and can no longer be cancelled here - contact the admin.', 422);
         }
 
         $sale->update(['status' => 'cancelled']);

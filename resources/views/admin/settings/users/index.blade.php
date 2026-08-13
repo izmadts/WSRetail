@@ -13,7 +13,7 @@
             <i class="fas fa-plus mr-1"></i> Add User
         </a>
     </div>
-    <p class="px-6 pt-4 text-xs text-gray-500">Sales agents have their own management screen under Agents - this covers admin/manager/accountant accounts.</p>
+    <p class="px-6 pt-4 text-xs text-gray-500">Covers admin/manager/accountant/pos_manager accounts.</p>
     <div class="p-6 overflow-x-auto">
         <table class="w-full">
             <thead>
@@ -21,6 +21,7 @@
                     <th class="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-2 px-2">Name</th>
                     <th class="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-2 px-2">Email</th>
                     <th class="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-2 px-2">Role</th>
+                    <th class="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-2 px-2">POS Location</th>
                     <th class="text-center text-xs font-medium text-gray-500 uppercase tracking-wider py-2 px-2">Status</th>
                     <th class="text-center text-xs font-medium text-gray-500 uppercase tracking-wider py-2 px-2">Actions</th>
                 </tr>
@@ -31,8 +32,9 @@
                     <td class="py-2 px-2 font-medium text-gray-900">{{ $user->name }}</td>
                     <td class="py-2 px-2 text-sm text-gray-600">{{ $user->email }}</td>
                     <td class="py-2 px-2 text-sm text-gray-600">
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">{{ ucfirst($user->role) }}</span>
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">{{ ucfirst(str_replace('_', ' ', $user->role)) }}</span>
                     </td>
+                    <td class="py-2 px-2 text-sm text-gray-600">{{ $user->location->name ?? '-' }}</td>
                     <td class="py-2 px-2 text-center">
                         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $user->is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600' }}">
                             {{ $user->is_active ? 'Active' : 'Inactive' }}
@@ -54,7 +56,7 @@
                     </td>
                 </tr>
                 @empty
-                <tr><td colspan="5" class="py-8 text-center text-gray-400">No staff users found.</td></tr>
+                <tr><td colspan="6" class="py-8 text-center text-gray-400">No staff users found.</td></tr>
                 @endforelse
             </tbody>
         </table>

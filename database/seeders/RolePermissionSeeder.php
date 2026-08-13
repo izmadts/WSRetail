@@ -14,20 +14,22 @@ class RolePermissionSeeder extends Seeder
         // it always passes every check (see User::hasPermission()).
         $defaults = [
             'manager' => [
-                'full' => ['dashboard', 'products', 'categories', 'suppliers', 'purchases', 'purchase-returns', 'inventory', 'customers', 'sales', 'sales-returns', 'agents', 'reports', 'exports', 'employees', 'leaves'],
+                'full' => ['dashboard', 'products', 'categories', 'suppliers', 'purchases', 'purchase-returns', 'inventory', 'customers', 'sales', 'sales-returns', 'reports', 'exports', 'employees', 'leaves'],
                 'view_only' => ['accounts', 'expenses', 'incomes', 'money-transfers', 'bank-reconciliations', 'activity-logs'],
                 'none' => ['backups', 'settings', 'payroll'],
             ],
             'accountant' => [
                 'full' => ['accounts', 'expenses', 'incomes', 'money-transfers', 'bank-reconciliations', 'reports', 'exports', 'payroll'],
-                'view_only' => ['dashboard', 'products', 'suppliers', 'purchases', 'customers', 'sales', 'agents', 'activity-logs', 'employees', 'leaves'],
+                'view_only' => ['dashboard', 'products', 'suppliers', 'purchases', 'customers', 'sales', 'activity-logs', 'employees', 'leaves'],
                 'none' => ['backups', 'settings', 'categories', 'purchase-returns', 'inventory', 'sales-returns'],
             ],
-            'sales_agent' => [
-                // Agents operate entirely through the separate agent.* route
-                // surface, which the role:admin,manager,accountant gate
-                // already blocks them from leaving - these rows matter only
-                // if that ever changes.
+            'pos_manager' => [
+                // Locked to the POS screen only (admin.sales.pos, gated by
+                // permission:sales,create - the sales route group itself is
+                // also gated permission:sales,view, hence view here too).
+                // Everything else, including Settings, is 'none' so they
+                // can never reach it even though role:admin,manager,
+                // accountant,pos_manager lets them into the /admin group.
                 'full' => [],
                 'view_only' => [],
                 'none' => \App\Models\RolePermission::MODULES,
@@ -47,6 +49,14 @@ class RolePermissionSeeder extends Seeder
                 RolePermission::updateOrCreate(['role' => $role, 'module' => $module], $perm);
             }
         }
+
+        // pos_manager's one carve-out: 'sales' view+create so admin.sales.pos
+        // (and the store() it posts to) are reachable, but not edit/delete -
+        // they can't touch existing sales beyond what they themselves ring up.
+        RolePermission::updateOrCreate(
+            ['role' => 'pos_manager', 'module' => 'sales'],
+            ['can_view' => true, 'can_create' => true, 'can_edit' => false, 'can_delete' => false]
+        );
 
         $this->command->info('✅ Role permissions seeded successfully!');
     }

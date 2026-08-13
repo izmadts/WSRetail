@@ -17,19 +17,6 @@
             @method('PUT')
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <!-- Agent Selection -->
-                <div class="md:col-span-2">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Assign to Agent</label>
-                    <select name="created_by_agent_id" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500">
-                        <option value="">None</option>
-                        @foreach($agents as $agent)
-                        <option value="{{ $agent->id }}" {{ old('created_by_agent_id', $customer->created_by_agent_id) == $agent->id ? 'selected' : '' }}>
-                            {{ $agent->name }} ({{ $agent->email }})
-                        </option>
-                        @endforeach
-                    </select>
-                    <p class="text-xs text-gray-500 mt-1">Assign to agent. Agent will see this customer in their dashboard.</p>
-                </div>
                 <!-- Customer Group -->
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Customer Group</label>
@@ -154,7 +141,7 @@
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">
                         Credit Limit
-                        <x-help-tooltip>The most this customer should owe at once. If Settings &gt; Commission &amp; Bonus has "Block new credit sales that would exceed a customer's Credit Limit" turned on (it's off by default), a new credit sale that would push their balance past this number is refused. Leave at 0 for no limit.</x-help-tooltip>
+                        <x-help-tooltip>The most this customer should owe at once. If Settings &gt; Credit has "Block new credit sales that would exceed a customer's Credit Limit" turned on (it's off by default), a new credit sale that would push their balance past this number is refused. Leave at 0 for no limit.</x-help-tooltip>
                     </label>
                     <input type="number" step="0.01" name="credit_limit" value="{{ old('credit_limit', $customer->credit_limit) }}"
                         class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 @error('credit_limit') border-red-500 @enderror"
@@ -165,7 +152,7 @@
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">
                         Credit Days
-                        <x-help-tooltip>How many days one of this customer's credit sales can sit unpaid before it counts as "overdue" - overrides the global grace period in Settings &gt; Commission &amp; Bonus just for this customer. Leave at 0 to use the global default instead.</x-help-tooltip>
+                        <x-help-tooltip>How many days one of this customer's credit sales can sit unpaid before it counts as "overdue" - overrides the global grace period in Settings &gt; Credit just for this customer. Leave at 0 to use the global default instead.</x-help-tooltip>
                     </label>
                     <input type="number" name="credit_days" value="{{ old('credit_days', $customer->credit_days) }}"
                         class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 @error('credit_days') border-red-500 @enderror"

@@ -16,7 +16,7 @@ class User extends Authenticatable
         'email',
         'password',
         'role',
-        'channel',
+        'location_id',
         'employee_id',
         'phone',
         'cnic',
@@ -29,14 +29,6 @@ class User extends Authenticatable
         'personal_photo',
         'basic_salary',
         'fuel_allowance',
-        'commission_rate_cash',
-        'commission_rate_credit',
-        'commission_slabs',
-        'sales_target',
-        'payout_account_type',
-        'payout_account_title',
-        'payout_account_number',
-        'payout_account_provider',
         'is_active',
         'approved_at',
         'approved_by',
@@ -53,8 +45,6 @@ class User extends Authenticatable
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
         'is_active' => 'boolean',
-        'sales_target' => 'array',
-        'commission_slabs' => 'array',
         'approved_at' => 'datetime',
         'last_login_at' => 'datetime',
     ];
@@ -63,19 +53,15 @@ class User extends Authenticatable
     {
         parent::boot();
 
-        // Every User-creation path (StaffUserController::store(),
-        // AgentRegistrationController::register()) funnels through
-        // User::create(), so this one hook is what makes "the system
-        // automatically adds anyone who uses this software" true, without
-        // touching either controller. See Employee::createFromUser().
+        // Every User-creation path funnels through User::create(), so this
+        // one hook is what makes "the system automatically adds anyone who
+        // uses this software" true, without touching every controller that
+        // creates one. See Employee::createFromUser().
         static::created(function ($user) {
             Employee::createFromUser($user);
         });
 
-        // Keep the linked Employee's active/approval state in step - most
-        // importantly an agent's pending -> approved transition
-        // (AgentManagementController::doApprove()), which only updates
-        // this User row, not a new one.
+        // Keep the linked Employee's active/approval state in step.
         static::updated(function ($user) {
             if ($user->isDirty(['is_active', 'approved_at', 'approved_by'])) {
                 $employee = Employee::where('user_id', $user->id)->first();
@@ -103,26 +89,14 @@ class User extends Authenticatable
         return $this->role === 'accountant';
     }
 
-    public function isSalesAgent()
+    public function isPosManager()
     {
-        return $this->role === 'sales_agent';
+        return $this->role === 'pos_manager';
     }
 
-    /**
-     * Whether this agent is allowed to work a CustomerGroup priced via
-     * $priceField ('sale_price' = retail, 'wholesale_price' = wholesale).
-     * Null/'both' channel is unrestricted - the default for every agent
-     * created before this field existed, so nothing breaks retroactively.
-     */
-    public function allowsPriceField(string $priceField): bool
+    public function location()
     {
-        if (empty($this->channel) || $this->channel === 'both') {
-            return true;
-        }
-
-        return $this->channel === 'wholesale'
-            ? $priceField === 'wholesale_price'
-            : $priceField === 'sale_price';
+        return $this->belongsTo(Location::class);
     }
 
     public function isActive()
@@ -143,7 +117,7 @@ class User extends Authenticatable
      * provides - a same-named override here would silently break that.
      *
      * admin always passes everything; the matrix only constrains
-     * manager/accountant/sales_agent.
+     * manager/accountant/pos_manager.
      */
     public function hasPermission($module, $ability = 'view')
     {
@@ -161,22 +135,6 @@ class User extends Authenticatable
     // RELATIONSHIPS
     // =============================================
 
-    public function customers()
-    {
-        return $this->hasMany(Customer::class, 'created_by_agent_id');
-    }
-
-    public function sales()
-    {
-        return $this->hasMany(Sale::class, 'agent_id');
-    }
-
-    // ✅ FIX: Add commissionLogs relationship
-    public function commissionLogs()
-    {
-        return $this->hasMany(AgentCommissionLog::class, 'agent_id');
-    }
-
     public function approvedBy()
     {
         return $this->belongsTo(User::class, 'approved_by');
@@ -191,11 +149,6 @@ class User extends Authenticatable
     // SCOPES
     // =============================================
 
-    public function scopeAgents($query)
-    {
-        return $query->where('role', 'sales_agent');
-    }
-
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
@@ -204,13 +157,6 @@ class User extends Authenticatable
     public function scopeApproved($query)
     {
         return $query->whereNotNull('approved_at');
-    }
-
-    public function scopePending($query)
-    {
-        return $query->where('role', 'sales_agent')
-            ->where('is_active', false)
-            ->whereNull('approved_at');
     }
 
     // =============================================

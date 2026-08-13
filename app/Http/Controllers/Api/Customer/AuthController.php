@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Api\Customer;
 
 use App\Models\Customer;
 use App\Models\CustomerGroup;
-use App\Models\User;
 use App\Http\Resources\Api\Customer\CustomerProfileResource;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -12,21 +11,16 @@ use Illuminate\Support\Facades\Validator;
 class AuthController extends ApiController
 {
     /**
-     * One-time entry point for the seller app: no password, no OTP screen -
-     * the seller app already owns identity/verification on its side. This
-     * either creates a new Customer or matches an existing one BY PHONE
-     * (so it also merges with a customer an agent already registered
-     * manually in the web/agent app) and hands back a Sanctum token the
-     * seller app stores and reuses for every later call. Protected by the
-     * integration.key middleware, not by anything customer-specific -
-     * that's the actual trust boundary here, since phone number alone is
-     * not a secret.
+     * One-time entry point for the storefront: no password, no OTP screen -
+     * the storefront's backend already owns identity/verification on its
+     * side (it authenticates this call with the shared integration key).
+     * This either creates a new Customer or matches an existing one BY
+     * PHONE and hands back a Sanctum token the storefront stores and reuses
+     * for every later call. Protected by the integration.key middleware,
+     * not by anything customer-specific - that's the actual trust boundary
+     * here, since phone number alone is not a secret.
      *
-     * agent_id / direct decide who gets commission credit on this
-     * customer's orders (created_by_agent_id) - NOT pricing. Every new
-     * seller-app customer defaults to the Wholesale customer_group
-     * regardless of agent, per policy: "all vendors/shop owners are
-     * wholesale customers by default, admin or agent can change it."
+     * Every new storefront customer defaults to the Retail customer_group.
      * See OrderController::resolveChannel, which prices off customer_group.
      */
     public function connect(Request $request)
@@ -42,8 +36,6 @@ class AuthController extends ApiController
             'gps_location' => 'nullable|string|max:255',
             'cnic' => 'nullable|string|max:20',
             'ntn' => 'nullable|string|max:20',
-            'agent_id' => 'nullable|integer',
-            'direct' => 'nullable|boolean',
             'device_name' => 'nullable|string|max:255',
         ]);
 
@@ -52,25 +44,6 @@ class AuthController extends ApiController
         }
 
         $data = $validator->validated();
-        $wantsDirect = (bool) ($data['direct'] ?? false);
-
-        if (!empty($data['agent_id']) && !$wantsDirect) {
-            // This whole API is a wholesale-only channel - the agent must be
-            // allowed to work wholesale too (unrestricted/null channel counts
-            // as allowed, same as everywhere else this is checked).
-            $agentValid = User::where('id', $data['agent_id'])
-                ->where('role', 'sales_agent')
-                ->where('is_active', true)
-                ->whereNotNull('approved_at')
-                ->where(fn ($q) => $q->whereNull('channel')->orWhereIn('channel', ['wholesale', 'both']))
-                ->exists();
-
-            if (!$agentValid) {
-                return $this->error('Selected sales agent is not valid or not active.', 422, [
-                    'agent_id' => ['This agent does not exist or is not an active, approved sales agent.'],
-                ]);
-            }
-        }
 
         $customer = Customer::where('phone', $data['phone'])->first();
 
@@ -88,39 +61,27 @@ class AuthController extends ApiController
 
         if ($customer) {
             $customer->fill($profileFields);
-
-            if ($wantsDirect) {
-                $customer->created_by_agent_id = null;
-                $customer->is_agent_customer = false;
-            } elseif (!empty($data['agent_id'])) {
-                $customer->created_by_agent_id = $data['agent_id'];
-                $customer->is_agent_customer = true;
-            }
-            // Neither given: leave the existing agent link untouched.
-            // customer_group_id is likewise never touched on reconnect -
-            // once an admin/agent has set a pricing tier it isn't silently
-            // reset just because the seller app called /connect again.
-
+            // customer_group_id is never touched on reconnect - once an
+            // admin has set a pricing tier it isn't silently reset just
+            // because the storefront called /connect again.
             $customer->is_active = true;
             $customer->save();
         } else {
-            $wholesaleGroupId = CustomerGroup::where('price_field', 'wholesale_price')->value('id');
+            $retailGroupId = CustomerGroup::where('price_field', 'sale_price')->value('id');
 
             $customer = Customer::create(array_merge($profileFields, [
                 'phone' => $data['phone'],
-                'created_by_agent_id' => $wantsDirect ? null : ($data['agent_id'] ?? null),
-                'is_agent_customer' => !$wantsDirect && !empty($data['agent_id']),
-                'customer_group_id' => $wholesaleGroupId,
+                'customer_group_id' => $retailGroupId,
                 'is_active' => true,
             ]));
         }
 
-        $token = $customer->createToken($data['device_name'] ?? 'seller-app')->plainTextToken;
+        $token = $customer->createToken($data['device_name'] ?? 'storefront')->plainTextToken;
 
         return $this->success([
             'token' => $token,
             'token_type' => 'Bearer',
-            'customer' => new CustomerProfileResource($customer->fresh(['customerGroup', 'createdByAgent'])),
+            'customer' => new CustomerProfileResource($customer->fresh('customerGroup')),
         ], 'Connected successfully.');
     }
 
@@ -133,7 +94,7 @@ class AuthController extends ApiController
 
     public function me(Request $request)
     {
-        return $this->success(new CustomerProfileResource($this->customer()->load(['customerGroup', 'createdByAgent'])));
+        return $this->success(new CustomerProfileResource($this->customer()->load('customerGroup')));
     }
 
     /**
@@ -168,6 +129,6 @@ class AuthController extends ApiController
 
         $customer->update($validated);
 
-        return $this->success(new CustomerProfileResource($customer->fresh(['customerGroup', 'createdByAgent'])), 'Profile updated successfully.');
+        return $this->success(new CustomerProfileResource($customer->fresh('customerGroup')), 'Profile updated successfully.');
     }
 }

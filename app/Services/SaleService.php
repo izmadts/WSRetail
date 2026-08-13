@@ -26,13 +26,6 @@ class SaleService
 {
     use AccountingTrait;
 
-    protected $commissionService;
-
-    public function __construct(CommissionService $commissionService)
-    {
-        $this->commissionService = $commissionService;
-    }
-
     /**
      * Apply stock + inventory/revenue accounting for a sale.
      * IDEMPOTENT: no-op if stock movements already exist for this sale.
@@ -63,18 +56,12 @@ class SaleService
             $this->updateStock($sale);
             $this->createStockMovements($sale);
             $this->postAccounting($sale);
-
-            if ($sale->payment_term === 'cash') {
-                $this->commissionService->calculateCashCommission($sale);
-            }
         });
     }
 
     /**
-     * Reverse stock + inventory/revenue accounting for a sale, including any
-     * commission already accrued on it. IDEMPOTENT: no-op if no stock
-     * movements exist (which also means no commission could have accrued -
-     * both are gated behind the same "sale was actually applied" state).
+     * Reverse stock + inventory/revenue accounting for a sale. IDEMPOTENT:
+     * no-op if no stock movements exist.
      *
      * Used by both the edit flow (syncItemsAndUpdate, which re-applies fresh
      * afterward) and full deletion (reverseForDeletion, below). Deliberately
@@ -98,14 +85,13 @@ class SaleService
             $this->reverseStock($sale);
             $this->deleteStockMovements($sale);
             $this->deleteJournalEntries($sale, 'sale');
-            $this->commissionService->reverseSaleCommission($sale);
         });
     }
 
     /**
      * Full teardown for a sale that's being deleted outright: reverses
-     * stock/accounting/commission (via reverseStockAndAccounting above),
-     * then also removes any payments recorded against it and their journal
+     * stock/accounting (via reverseStockAndAccounting above), then also
+     * removes any payments recorded against it and their journal
      * entries - without this, deleting a partially-paid sale leaves its
      * Cash/Receivable payment entries in the ledger forever with no sale
      * behind them. Not used by edits; those keep payment history intact.
@@ -175,15 +161,10 @@ class SaleService
 
             $sale->paid_amount = $sale->paid_amount + $amount;
             $sale->due_amount = $sale->total_amount - $sale->paid_amount;
-            $sale->updateRecoveryPercentage();
             $sale->status = $sale->due_amount <= 0 ? 'paid' : 'partial';
             $sale->save();
 
             $this->postPaymentAccounting($sale, $amount, $method);
-
-            // Both methods check is_commission_held themselves.
-            $this->commissionService->accrueCreditCommission($sale, $amount);
-            $this->commissionService->awardRecoveryBonus($sale);
 
             Log::info('Payment recorded for sale', [
                 'sale_id' => $sale->id,
@@ -199,6 +180,18 @@ class SaleService
     // INTERNAL HELPERS
     // =============================================
 
+    /**
+     * A variant line item's stock lives on the ProductVariant row, not the
+     * parent Product - resolves and locks whichever one actually holds the
+     * quantity for this item.
+     */
+    private function stockableFor($item)
+    {
+        return $item->product_variant_id
+            ? \App\Models\ProductVariant::where('id', $item->product_variant_id)->lockForUpdate()->first()
+            : Product::where('id', $item->product_id)->lockForUpdate()->first();
+    }
+
     private function updateStock(Sale $sale)
     {
         foreach ($sale->items as $item) {
@@ -207,13 +200,14 @@ class SaleService
             // can't both read the same starting stock and both pass the
             // sufficiency check below (a lost-update race that could
             // oversell into negative stock).
-            $product = Product::where('id', $item->product_id)->lockForUpdate()->first();
-            if ($product) {
-                if ($product->current_stock < $item->quantity) {
-                    throw new \Exception("Insufficient stock for product: {$product->name}. Available: {$product->current_stock}, Required: {$item->quantity}");
+            $stockable = $this->stockableFor($item);
+            if ($stockable) {
+                if ($stockable->current_stock < $item->quantity) {
+                    $label = $item->product_variant_id ? $stockable->label : $stockable->name;
+                    throw new \Exception("Insufficient stock for product: {$label}. Available: {$stockable->current_stock}, Required: {$item->quantity}");
                 }
-                $product->current_stock = floatval($product->current_stock) - floatval($item->quantity);
-                $product->save();
+                $stockable->current_stock = floatval($stockable->current_stock) - floatval($item->quantity);
+                $stockable->save();
             }
         }
     }
@@ -221,10 +215,10 @@ class SaleService
     private function reverseStock(Sale $sale)
     {
         foreach ($sale->items as $item) {
-            $product = Product::where('id', $item->product_id)->lockForUpdate()->first();
-            if ($product) {
-                $product->current_stock = floatval($product->current_stock) + floatval($item->quantity);
-                $product->save();
+            $stockable = $this->stockableFor($item);
+            if ($stockable) {
+                $stockable->current_stock = floatval($stockable->current_stock) + floatval($item->quantity);
+                $stockable->save();
             }
         }
     }
@@ -232,12 +226,15 @@ class SaleService
     private function createStockMovements(Sale $sale)
     {
         foreach ($sale->items as $item) {
-            $product = Product::find($item->product_id);
-            if ($product) {
-                $oldStock = floatval($product->current_stock) + floatval($item->quantity);
+            $stockable = $item->product_variant_id
+                ? \App\Models\ProductVariant::find($item->product_variant_id)
+                : Product::find($item->product_id);
+            if ($stockable) {
+                $oldStock = floatval($stockable->current_stock) + floatval($item->quantity);
 
                 StockMovement::create([
-                    'product_id' => $product->id,
+                    'product_id' => $item->product_id,
+                    'product_variant_id' => $item->product_variant_id,
                     'type' => 'out',
                     'reference_type' => 'sale',
                     'reference_id' => $sale->id,
@@ -245,7 +242,7 @@ class SaleService
                     'unit_price' => $item->unit_price,
                     'total_price' => $item->total_price,
                     'stock_before' => $oldStock,
-                    'stock_after' => $product->current_stock,
+                    'stock_after' => $stockable->current_stock,
                     'notes' => "Sale #{$sale->invoice_no}" . ($sale->customer ? " - Customer: {$sale->customer->name}" : ''),
                 ]);
             }
@@ -305,8 +302,10 @@ class SaleService
         foreach ($sale->items as $item) {
             $unitCost = $item->unit_cost;
             if ($unitCost === null) {
-                $product = Product::find($item->product_id);
-                $unitCost = floatval($product->purchase_price ?? 0);
+                $costSource = $item->product_variant_id
+                    ? \App\Models\ProductVariant::find($item->product_variant_id)
+                    : Product::find($item->product_id);
+                $unitCost = floatval($costSource->purchase_price ?? 0);
                 $item->unit_cost = $unitCost;
                 $item->saveQuietly();
             }
@@ -399,9 +398,9 @@ class SaleService
     }
 
     /**
-     * Repost ONLY the 'sale' journal entries, without touching stock or
-     * commission. See PurchaseService::repostAccountingOnly() for why this
-     * exists - applyStockAndAccounting()'s idempotency guard checks
+     * Repost ONLY the 'sale' journal entries, without touching stock. See
+     * PurchaseService::repostAccountingOnly() for why this exists -
+     * applyStockAndAccounting()'s idempotency guard checks
      * StockMovement, not JournalEntry, so it can't repair a sale whose
      * StockMovement rows exist but whose journal entries were lost. Caller
      * is responsible for confirming the sale's status still warrants

@@ -29,18 +29,21 @@
                         <p class="mt-1 text-xs text-gray-500" x-show="customer_id" x-text="priceField === 'wholesale_price' ? 'Wholesale pricing applies' : 'Retail pricing applies'"></p>
                     </div>
 
+                    @if($locations->isNotEmpty())
                     <div>
                         <label class="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
-                            Agent
-                            <x-help-tooltip>Selecting an agent credits them with commission on this sale, calculated per their commission tier (shown as "Est. Commission" below) - it doesn't change what the customer pays. Leave blank for a walk-in / no-agent sale.</x-help-tooltip>
+                            Location
+                            <x-help-tooltip>Each location's POS Use (set in Settings &gt; Locations) can lock this sale to Retail-only or Wholesale-only products/pricing, overriding the customer group's default. Leave blank if this sale isn't tied to a specific location.</x-help-tooltip>
                         </label>
-                        <select name="agent_id" x-model="agent_id" @change="calculateTotals()" class="w-full px-2 sm:px-3 py-1.5 sm:py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <option value="">Select Agent</option>
-                            @foreach($agents as $agent)
-                            <option value="{{ $agent->id }}">{{ $agent->name }}</option>
+                        <select name="location_id" x-model="location_id" @change="onLocationChange($event)" class="w-full px-2 sm:px-3 py-1.5 sm:py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="">No specific location</option>
+                            @foreach($locations as $loc)
+                            <option value="{{ $loc->id }}" data-pos-type="{{ $loc->pos_type }}">{{ $loc->name }} ({{ ucfirst($loc->pos_type) }})</option>
                             @endforeach
                         </select>
+                        <p class="mt-1 text-xs text-gray-500" x-show="locationType && locationType !== 'both'" x-text="'Locked to ' + locationType + ' products/pricing at this location'"></p>
                     </div>
+                    @endif
 
                     <div>
                         <label class="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Date <span class="text-red-500">*</span></label>
@@ -88,7 +91,13 @@
                                             <select :name="'items['+index+'][product_id]'" x-model="item.product_id" @change="onProductChange(index)" class="w-full px-2 py-1 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
                                                 <option value="">Select Product</option>
                                                 <template x-for="p in visibleProducts(item.product_id)" :key="p.id">
-                                                    <option :value="p.id" x-text="p.name + ' (' + p.code + ') - Stock: ' + p.current_stock"></option>
+                                                    <option :value="p.id" x-text="p.name + ' (' + p.code + ')' + (p.has_variants ? '' : ' - Stock: ' + p.current_stock)"></option>
+                                                </template>
+                                            </select>
+                                            <select x-show="hasVariants(item.product_id)" :name="'items['+index+'][product_variant_id]'" x-model="item.product_variant_id" @change="onVariantChange(index)" class="w-full mt-1 px-2 py-1 text-sm border border-gray-300 rounded-lg bg-white">
+                                                <option value="">Select Variant</option>
+                                                <template x-for="v in variantsFor(item.product_id)" :key="v.id">
+                                                    <option :value="v.id" x-text="v.label + ' - Stock: ' + v.current_stock"></option>
                                                 </template>
                                             </select>
                                             <p class="mt-1 text-xs" x-show="item.product_id">
@@ -115,7 +124,13 @@
                                 <select :name="'items['+index+'][product_id]'" x-model="item.product_id" @change="onProductChange(index)" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg bg-white">
                                     <option value="">Select Product</option>
                                     <template x-for="p in visibleProducts(item.product_id)" :key="p.id">
-                                        <option :value="p.id" x-text="p.name + ' - Stock: ' + p.current_stock"></option>
+                                        <option :value="p.id" x-text="p.name + (p.has_variants ? '' : ' - Stock: ' + p.current_stock)"></option>
+                                    </template>
+                                </select>
+                                <select x-show="hasVariants(item.product_id)" :name="'items['+index+'][product_variant_id]'" x-model="item.product_variant_id" @change="onVariantChange(index)" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg bg-white">
+                                    <option value="">Select Variant</option>
+                                    <template x-for="v in variantsFor(item.product_id)" :key="v.id">
+                                        <option :value="v.id" x-text="v.label + ' - Stock: ' + v.current_stock"></option>
                                     </template>
                                 </select>
                                 <p class="text-xs" x-show="item.product_id">
@@ -167,11 +182,6 @@
                                 <type="number" name="shipping_cost" x-model="shipping" @input="calculateTotals()" class="w-24 px-2 py-1 text-sm text-right border border-gray-300 rounded-lg" min="0" step="0.01">
                                 <span class="text-sm" x-text="'Rs. ' + shipping.toFixed(2)"></span>
                             </div>
-                            <div class="flex items-center gap-2 justify-end border-t border-gray-200 pt-2" x-show="agent_id">
-                                <span class="text-sm font-semibold text-gray-700">Est. Commission:</span>
-                                <span class="text-sm font-semibold text-purple-600" x-text="'Rs. ' + commissionAmount.toFixed(2)"></span>
-                            </div>
-                            <p class="text-xs text-gray-500 text-right" x-show="agent_id" x-text="commissionNote"></p>
                             <div class="flex items-center gap-2 justify-end bg-blue-50 p-2 rounded-lg border-2 border-blue-200">
                                 <span class="text-base font-bold text-gray-700">Grand Total:</span>
                                 <span class="text-lg font-bold text-blue-600" x-text="'Rs. ' + grandTotal.toFixed(2)"></span>
@@ -202,15 +212,14 @@
 
 <script>
 function saleForm() {
-    const cashTiers = @json($commissionPreview['cash_tiers']);
-    const creditRate = @json($commissionPreview['credit_rate']);
-    const agentMtdCash = @json($commissionPreview['agent_mtd_cash']);
     const allProducts = @json($productsForJs);
 
     return {
         items: [],
         customer_id: '',
-        agent_id: '',
+        location_id: '',
+        locationType: '',
+        customerPriceField: 'sale_price',
         payment_term: 'cash',
         priceField: 'sale_price',
         discount: 0,
@@ -220,8 +229,6 @@ function saleForm() {
         amountReceived: '',
         subTotal: 0,
         discountAmount: 0,
-        commissionAmount: 0,
-        commissionNote: '',
         grandTotal: 0,
         confirmBelowCost: false,
         allProducts: allProducts,
@@ -230,22 +237,42 @@ function saleForm() {
 
         onCustomerChange(event) {
             const option = event.target.selectedOptions[0];
-            this.priceField = (option && option.dataset.priceField) ? option.dataset.priceField : 'sale_price';
+            this.customerPriceField = (option && option.dataset.priceField) ? option.dataset.priceField : 'sale_price';
+            this.refreshPriceField();
+        },
 
-            // Re-validate existing rows against the newly selected
-            // customer's group: a product not sold to that group gets
-            // cleared, everything else re-prices to the group's price field.
+        onLocationChange(event) {
+            const option = event.target.selectedOptions[0];
+            this.locationType = (option && option.dataset.posType) ? option.dataset.posType : '';
+            this.refreshPriceField();
+        },
+
+        // A location locked to Retail/Wholesale overrides the customer
+        // group's price field entirely (e.g. a retail-only location never
+        // sells at wholesale_price, no matter the customer's group) - "Both"
+        // or no location selected falls back to the customer group as before.
+        refreshPriceField() {
+            this.priceField = this.locationType === 'retail' ? 'sale_price'
+                : this.locationType === 'wholesale' ? 'wholesale_price'
+                : this.customerPriceField;
+
+            // Re-validate existing rows against the new price field: a
+            // product not sellable under it gets cleared, everything else
+            // re-prices to it.
             this.items.forEach((item, index) => {
                 if (!item.product_id) return;
                 const product = this.allProducts.find(p => p.id == item.product_id);
                 const stillAllowed = product && (this.priceField === 'wholesale_price' ? product.is_wholesale : product.is_retail);
                 if (!stillAllowed) {
                     item.product_id = '';
+                    item.product_variant_id = '';
                     item.unit_price = 0;
                     item.stock = null;
                     item.cost = null;
                 } else {
-                    item.unit_price = this.priceField === 'wholesale_price' ? product.wholesale_price : product.sale_price;
+                    const variant = item.product_variant_id ? product.variants.find(v => v.id == item.product_variant_id) : null;
+                    const priceSource = variant || product;
+                    item.unit_price = this.priceField === 'wholesale_price' ? priceSource.wholesale_price : priceSource.sale_price;
                 }
                 this.calculateRow(index);
             });
@@ -261,7 +288,7 @@ function saleForm() {
         },
 
         addRow() {
-            this.items.push({ product_id: '', quantity: 1, unit_price: 0, discount: 0, tax: 0, total: 0, stock: null, cost: null });
+            this.items.push({ product_id: '', product_variant_id: '', quantity: 1, unit_price: 0, discount: 0, tax: 0, total: 0, stock: null, cost: null });
             this.calculateTotals();
         },
 
@@ -269,14 +296,44 @@ function saleForm() {
             if (this.items.length > 1) { this.items.splice(index, 1); this.calculateTotals(); }
         },
 
+        hasVariants(productId) {
+            const product = this.allProducts.find(p => p.id == productId);
+            return !!(product && product.has_variants);
+        },
+
+        variantsFor(productId) {
+            const product = this.allProducts.find(p => p.id == productId);
+            return product ? product.variants : [];
+        },
+
         onProductChange(index) {
             const item = this.items[index];
+            item.product_variant_id = '';
             const product = this.allProducts.find(p => p.id == item.product_id);
-            if (product) {
+            if (product && !product.has_variants) {
                 item.unit_price = this.priceField === 'wholesale_price' ? product.wholesale_price : product.sale_price;
                 item.cost = product.purchase_price;
                 item.stock = product.current_stock;
             } else {
+                // A variant product has nothing sellable yet until a
+                // specific variant is picked - see onVariantChange().
+                item.unit_price = 0;
+                item.stock = null;
+                item.cost = null;
+            }
+            this.calculateRow(index);
+        },
+
+        onVariantChange(index) {
+            const item = this.items[index];
+            const product = this.allProducts.find(p => p.id == item.product_id);
+            const variant = product ? product.variants.find(v => v.id == item.product_variant_id) : null;
+            if (variant) {
+                item.unit_price = this.priceField === 'wholesale_price' ? variant.wholesale_price : variant.sale_price;
+                item.cost = variant.purchase_price;
+                item.stock = variant.current_stock;
+            } else {
+                item.unit_price = 0;
                 item.stock = null;
                 item.cost = null;
             }
@@ -317,15 +374,6 @@ function saleForm() {
             this.calculateTotals();
         },
 
-        rateForCumulative(cumulative, tiers) {
-            for (const t of tiers) {
-                if (t.to === null || t.to === undefined || cumulative <= t.to) {
-                    return parseFloat(t.rate);
-                }
-            }
-            return tiers.length ? parseFloat(tiers[tiers.length - 1].rate) : 0;
-        },
-
         calculateTotals() {
             this.subTotal = this.items.reduce((sum, item) => sum + (parseFloat(item.total) || 0), 0);
 
@@ -335,25 +383,7 @@ function saleForm() {
             const tax = parseFloat(this.tax) || 0;
             const shipping = parseFloat(this.shipping) || 0;
 
-            const netTotal = this.subTotal - this.discountAmount + tax + shipping;
-
-            if (this.agent_id && this.payment_term === 'cash') {
-                const mtd = parseFloat(agentMtdCash[this.agent_id]) || 0;
-                const cumulative = mtd + netTotal;
-                const rate = this.rateForCumulative(cumulative, cashTiers);
-                this.commissionAmount = netTotal * rate / 100;
-                this.commissionNote = rate + '% bracket (month-to-date cash: Rs. ' + mtd.toFixed(0) + ')';
-            } else if (this.agent_id && this.payment_term === 'credit') {
-                this.commissionAmount = netTotal * creditRate / 100;
-                this.commissionNote = 'Estimate if fully recovered - credit sales accrue ' + creditRate + '% per payment received, not upfront.';
-            } else {
-                this.commissionAmount = 0;
-                this.commissionNote = '';
-            }
-
-            // Commission is an internal cost paid to the agent, not
-            // something added to what the customer owes.
-            this.grandTotal = netTotal;
+            this.grandTotal = this.subTotal - this.discountAmount + tax + shipping;
         },
 
         onSubmit(event) {

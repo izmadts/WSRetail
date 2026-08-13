@@ -16,7 +16,7 @@ class Product extends Model
         'purchase_price', 'sale_price', 'wholesale_price',
         'current_stock', 'min_stock_level', 'max_stock_level',
         'barcode', 'description', 'image', 'is_active',
-        'is_retail', 'is_wholesale',
+        'is_retail', 'is_wholesale', 'has_variants',
     ];
 
     protected $casts = [
@@ -29,6 +29,7 @@ class Product extends Model
         'is_active' => 'boolean',
         'is_retail' => 'boolean',
         'is_wholesale' => 'boolean',
+        'has_variants' => 'boolean',
     ];
 
     // Auto generate code and slug
@@ -83,6 +84,16 @@ class Product extends Model
         return $this->hasMany(PurchaseItem::class);
     }
 
+    public function variants()
+    {
+        return $this->hasMany(ProductVariant::class);
+    }
+
+    public function activeVariants()
+    {
+        return $this->variants()->where('is_active', true);
+    }
+
     // Scopes
     public function scopeActive($query)
     {
@@ -99,9 +110,40 @@ class Product extends Model
         return $query->where('is_wholesale', true);
     }
 
+    /**
+     * "Has something to sell" - a variant product's own current_stock is
+     * always 0 (unused, see ProductVariant), so it needs at least one
+     * variant with stock instead of the plain column check a non-variant
+     * product uses.
+     */
+    public function scopeInStock($query)
+    {
+        return $query->where(function ($q) {
+            $q->where('has_variants', false)->where('current_stock', '>', 0);
+        })->orWhere(function ($q) {
+            $q->where('has_variants', true)->whereHas('variants', function ($vq) {
+                $vq->where('is_active', true)->where('current_stock', '>', 0);
+            });
+        });
+    }
+
+    /**
+     * A variant product's own current_stock/min_stock_level columns are
+     * unused (each variant tracks its own - see ProductVariant), so this
+     * checks the variants directly for those rather than the always-zero
+     * parent row.
+     */
     public function scopeLowStock($query)
     {
-        return $query->whereColumn('current_stock', '<=', 'min_stock_level');
+        return $query->where(function ($q) {
+            $q->where('has_variants', false)
+                ->whereColumn('current_stock', '<=', 'min_stock_level');
+        })->orWhere(function ($q) {
+            $q->where('has_variants', true)
+                ->whereHas('variants', function ($vq) {
+                    $vq->whereColumn('current_stock', '<=', 'min_stock_level');
+                });
+        });
     }
 
     /**
@@ -112,18 +154,48 @@ class Product extends Model
      */
     public function scopeOverStock($query)
     {
-        return $query->where('max_stock_level', '>', 0)
-            ->whereColumn('current_stock', '>', 'max_stock_level');
+        return $query->where(function ($q) {
+            $q->where('has_variants', false)
+                ->where('max_stock_level', '>', 0)
+                ->whereColumn('current_stock', '>', 'max_stock_level');
+        })->orWhere(function ($q) {
+            $q->where('has_variants', true)
+                ->whereHas('variants', function ($vq) {
+                    $vq->where('max_stock_level', '>', 0)
+                        ->whereColumn('current_stock', '>', 'max_stock_level');
+                });
+        });
     }
 
     // Helper methods
     public function isLowStock()
     {
+        if ($this->has_variants) {
+            return $this->variants->contains(fn ($v) => $v->isLowStock());
+        }
+
         return $this->current_stock <= $this->min_stock_level;
+    }
+
+    /**
+     * Display/reporting figure only - never written to directly. A variant
+     * product's real stock lives on each ProductVariant row; this just
+     * rolls them up on demand so the products list/dashboard can show one
+     * number without a separate synced column to keep consistent.
+     */
+    public function totalStock()
+    {
+        return $this->has_variants
+            ? $this->variants->sum('current_stock')
+            : (float) $this->current_stock;
     }
 
     public function isOverStock()
     {
+        if ($this->has_variants) {
+            return $this->variants->contains(fn ($v) => (float) $v->max_stock_level > 0 && $v->current_stock > $v->max_stock_level);
+        }
+
         return (float) $this->max_stock_level > 0 && $this->current_stock > $this->max_stock_level;
     }
 

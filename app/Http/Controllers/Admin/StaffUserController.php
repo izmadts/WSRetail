@@ -4,31 +4,31 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Models\Location;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 
 /**
- * CRUD for admin/manager/accountant staff accounts. Sales agents have
- * their own richer management flow (approval, commission fields, KYC
- * documents) in AgentManagementController - this is deliberately not that,
- * it's the "there was no way to create a manager/accountant user at all"
- * gap the settings page needed to close.
+ * CRUD for admin/manager/accountant/pos_manager staff accounts - the
+ * "there was no way to create one at all" gap the settings page needed to
+ * close.
  */
 class StaffUserController extends Controller
 {
-    private const STAFF_ROLES = ['admin', 'manager', 'accountant'];
+    private const STAFF_ROLES = ['admin', 'manager', 'accountant', 'pos_manager'];
 
     public function index()
     {
-        $users = User::whereIn('role', self::STAFF_ROLES)->orderBy('name')->get();
+        $users = User::whereIn('role', self::STAFF_ROLES)->with('location')->orderBy('name')->get();
         return view('admin.settings.users.index', compact('users'));
     }
 
     public function create()
     {
-        return view('admin.settings.users.create');
+        $locations = Location::active()->orderBy('name')->get();
+        return view('admin.settings.users.create', compact('locations'));
     }
 
     public function store(Request $request)
@@ -38,6 +38,7 @@ class StaffUserController extends Controller
             'email' => 'required|email|unique:users',
             'password' => 'required|string|min:8|confirmed',
             'role' => ['required', Rule::in(self::STAFF_ROLES)],
+            'location_id' => 'nullable|exists:locations,id',
             'phone' => 'nullable|string|max:50',
             'is_active' => 'boolean',
         ]);
@@ -47,6 +48,7 @@ class StaffUserController extends Controller
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
             'role' => $validated['role'],
+            'location_id' => $validated['location_id'] ?? null,
             'phone' => $validated['phone'] ?? null,
             'is_active' => $request->boolean('is_active', true),
             'approved_at' => now(),
@@ -63,7 +65,8 @@ class StaffUserController extends Controller
             abort(404);
         }
 
-        return view('admin.settings.users.edit', compact('user'));
+        $locations = Location::active()->orderBy('name')->get();
+        return view('admin.settings.users.edit', compact('user', 'locations'));
     }
 
     public function update(Request $request, User $user)
@@ -76,6 +79,7 @@ class StaffUserController extends Controller
             'name' => 'required|string|max:255',
             'email' => ['required', 'email', Rule::unique('users')->ignore($user->id)],
             'role' => ['required', Rule::in(self::STAFF_ROLES)],
+            'location_id' => 'nullable|exists:locations,id',
             'phone' => 'nullable|string|max:50',
             'is_active' => 'boolean',
         ]);

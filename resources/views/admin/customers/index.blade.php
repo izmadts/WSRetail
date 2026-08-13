@@ -31,7 +31,6 @@
                         <th class="text-right text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-2">Balance</th>
                         <th class="text-center text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-2">Sales</th>
                         <th class="text-center text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-2">Status</th>
-                        <th class="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-2">Agent</th>
                         <th class="text-center text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-2">Actions</th>
                     </tr>
                 </thead>
@@ -67,9 +66,6 @@
                             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $customer->is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600' }}">
                                 {{ $customer->is_active ? 'Active' : 'Inactive' }}
                             </span>
-                        </td>
-                        <td class="py-3 px-2 text-sm text-gray-600">
-                            {{ $customer->createdByAgent->name ?? '-' }}
                         </td>
                         <td class="py-3 px-2 text-center">
                             <div class="flex items-center justify-center space-x-1">

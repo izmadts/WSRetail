@@ -9,7 +9,7 @@
 <div class="bg-white rounded-xl shadow-card overflow-hidden">
     <div class="px-6 py-4 border-b border-gray-200">
         <h4 class="text-lg font-semibold text-gray-900"><i class="fas fa-shield-alt text-blue-600 mr-2"></i> Role Permissions</h4>
-        <p class="text-sm text-gray-500 mt-1">Admin always has full access to everything and isn't shown here. These toggles constrain manager/accountant/sales_agent.</p>
+        <p class="text-sm text-gray-500 mt-1">Admin always has full access to everything and isn't shown here. These toggles constrain manager/accountant/pos_manager.</p>
     </div>
     <div class="p-6">
         <form action="{{ route('admin.settings.permissions.update') }}" method="POST">

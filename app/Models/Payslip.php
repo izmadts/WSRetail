@@ -5,8 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * The accrual-log equivalent of AgentCommissionLog - one row per employee
- * per payroll run, independently reversible via its own id.
+ * The accrual-log equivalent for payroll - one row per employee per
+ * payroll run, independently reversible via its own id.
  */
 class Payslip extends Model
 {

@@ -129,9 +129,6 @@ class ExportController extends Controller
             case 'incomes':
                 return Income::with('category')->orderBy('income_date', 'desc')->get();
 
-            case 'agents':
-                return User::where('role', 'sales_agent')->orderBy('name')->get();
-
             case 'receivable':
                 // balance is a computed accessor (opening_balance + sales - payments),
                 // not a column - can't filter in SQL, so filter/sort in PHP instead.

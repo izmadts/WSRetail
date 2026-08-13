@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# WSERP deploy bootstrap - run this ONCE via SSH after uploading/cloning the
+# WSRetail deploy bootstrap - run this ONCE via SSH after uploading/cloning the
 # codebase to a live server, before visiting the site in a browser.
 #
 # What this does NOT do (deliberately): touch the database, create the admin
@@ -73,7 +73,7 @@ elif command -v npm >/dev/null 2>&1; then
     npm ci
     npm run build
 else
-    warn "npm not found - skipping frontend build. Admin/agent pages need public/build/manifest.json to render correctly; build it separately (e.g. on your machine, then upload public/build/) before going live."
+    warn "npm not found - skipping frontend build. Admin pages need public/build/manifest.json to render correctly; build it separately (e.g. on your machine, then upload public/build/) before going live."
 fi
 
 # ------------------------------------------------------------------
@@ -101,10 +101,9 @@ else
     echo ""
     echo "Then visit your domain in a browser to finish setup - it will redirect"
     echo "you straight into the install wizard (database credentials, admin"
-    echo "account, company name/logo). Nothing else to run by hand."
+    echo "account, company name/logo, license key). Nothing else to run by hand."
     echo ""
-    warn "Reminder: this only prepares the WSERP backend. The Flutter apps"
-    warn "(izmafood-vendors, izmafood_saleagent) have their own hardcoded dev"
-    warn "API base URLs that need updating separately before release builds -"
-    warn "see DEPLOYMENT.md."
+    warn "Reminder: this only prepares the WSRetail backend. If you're also"
+    warn "deploying the companion Next.js storefront, see DEPLOYMENT.md step 4"
+    warn "for how to connect it."
 fi

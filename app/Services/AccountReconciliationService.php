@@ -4,8 +4,6 @@ namespace App\Services;
 
 use App\Models\Account;
 use App\Models\ActivityLog;
-use App\Models\AgentCommissionLog;
-use App\Models\AgentCommissionPayment;
 use App\Models\Customer;
 use App\Models\Expense;
 use App\Models\Income;
@@ -49,18 +47,16 @@ class AccountReconciliationService
     private const TWO_ROW_TYPES = [
         'expense', 'income', 'money_transfer', 'supplier_opening',
         'customer_opening', 'supplier_payment', 'customer_payment',
-        'purchase_return', 'sales_return', 'adjustment', 'opening', 'sale_commission',
+        'purchase_return', 'sales_return', 'adjustment', 'opening',
     ];
 
     private PurchaseService $purchaseService;
     private SaleService $saleService;
-    private CommissionService $commissionService;
 
-    public function __construct(PurchaseService $purchaseService, SaleService $saleService, CommissionService $commissionService)
+    public function __construct(PurchaseService $purchaseService, SaleService $saleService)
     {
         $this->purchaseService = $purchaseService;
         $this->saleService = $saleService;
-        $this->commissionService = $commissionService;
     }
 
     // =========================================================
@@ -189,12 +185,6 @@ class AccountReconciliationService
             $issues[] = $this->issue('missing', 'opening', $product->id, "Product #{$product->id} ({$product->name}) opening stock has no ledger entry.", 'medium', true, 'safe');
         }
 
-        foreach (AgentCommissionLog::where('amount', '!=', 0)->get() as $log) {
-            if (!$this->hasEntries('sale_commission', $log->id)) {
-                $issues[] = $this->issue('missing', 'sale_commission', $log->id, "Commission log #{$log->id} ({$log->description}) has no ledger entry.", 'medium', true, 'safe');
-            }
-        }
-
         return $issues;
     }
 
@@ -258,7 +248,7 @@ class AccountReconciliationService
         $this->scanArchivedButActiveOpenings($issues, 'customer_opening', Customer::class);
 
         $hardDeleteTypes = [
-            'adjustment' => StockAdjustment::class, 'opening' => Product::class, 'sale_commission' => AgentCommissionLog::class,
+            'adjustment' => StockAdjustment::class, 'opening' => Product::class,
             'supplier_payment' => SupplierPayment::class, 'customer_payment' => CustomerPayment::class,
         ];
         foreach ($hardDeleteTypes as $type => $model) {
@@ -320,7 +310,6 @@ class AccountReconciliationService
             ['expense', Expense::class, 'amount'],
             ['income', Income::class, 'amount'],
             ['money_transfer', MoneyTransfer::class, 'amount'],
-            ['sale_commission', AgentCommissionLog::class, 'amount'],
             ['supplier_payment', SupplierPayment::class, 'amount'],
             ['customer_payment', CustomerPayment::class, 'amount'],
         ];
@@ -335,13 +324,6 @@ class AccountReconciliationService
                 if (!$debitEntry) {
                     continue;
                 }
-                // abs() on both sides: AgentCommissionLog.amount can be
-                // legitimately negative (a write-off/reversal log), but
-                // postDoubleEntry() always stores a positive amount and
-                // encodes direction via debit/credit type instead - the
-                // other types here (Expense/Income/MoneyTransfer/
-                // Supplier|CustomerPayment) are always positive already,
-                // so abs() is a no-op for them.
                 $expected = round(abs((float) $record->{$field}), 2);
                 $actual = round(abs((float) $debitEntry->amount), 2);
                 if (abs($expected - $actual) > 0.01) {
@@ -390,13 +372,9 @@ class AccountReconciliationService
     }
 
     /**
-     * purchase_payment/sale_payment/commission_payment share one reference_id
-     * across many source rows, so they're checked as an aggregate sum
-     * rather than a 1:1 match. commission_payment is flagged only (never
-     * auto-fixed) - payCommission() allocates a lump payment across
-     * whichever AgentCommissionLog rows happen to be due at the time, so a
-     * fresh replay could legitimately allocate differently than history
-     * actually did; there is no safe mechanical "correct" repost for it.
+     * purchase_payment/sale_payment share one reference_id across many
+     * source rows, so they're checked as an aggregate sum rather than a
+     * 1:1 match.
      */
     private function scanPaymentAggregates(): array
     {
@@ -418,16 +396,6 @@ class AccountReconciliationService
             }
         }
 
-        $agentIds = AgentCommissionPayment::distinct()->pluck('agent_id');
-        foreach ($agentIds as $agentId) {
-            $sourceSum = round((float) AgentCommissionPayment::where('agent_id', $agentId)->sum('amount'), 2);
-            $journalSum = round((float) JournalEntry::where('reference_type', 'commission_payment')->where('reference_id', $agentId)->where('type', 'debit')->sum('amount'), 2);
-            if (abs($sourceSum - $journalSum) > 0.01) {
-                $agent = User::find($agentId);
-                $issues[] = $this->issue('amount_mismatch', 'commission_payment', $agentId, "Agent " . ($agent->name ?? "#{$agentId}") . ": recorded payouts total Rs. " . number_format($sourceSum, 2) . " but the ledger shows Rs. " . number_format($journalSum, 2) . ". Not auto-fixable - payouts are allocated against whichever commission logs were due at the time, which can't be safely replayed after the fact. Review manually via the Commission module.", 'medium', false, 'manual_only');
-            }
-        }
-
         return $issues;
     }
 
@@ -439,7 +407,7 @@ class AccountReconciliationService
     {
         $tiers = ['opening' => [], 'base' => [], 'payment' => []];
         $openingTypes = ['supplier_opening', 'customer_opening', 'opening'];
-        $baseTypes = ['purchase', 'sale', 'purchase_return', 'sales_return', 'adjustment', 'expense', 'income', 'money_transfer', 'sale_commission'];
+        $baseTypes = ['purchase', 'sale', 'purchase_return', 'sales_return', 'adjustment', 'expense', 'income', 'money_transfer'];
 
         foreach ($selectors as $selector) {
             $type = $selector['reference_type'];
@@ -641,17 +609,6 @@ class AccountReconciliationService
                 $product->postOpeningStock();
                 return true;
 
-            case 'sale_commission':
-                $log = AgentCommissionLog::find($id);
-                if (!$log) {
-                    return false;
-                }
-                if ($category !== 'missing') {
-                    JournalEntry::where('reference_type', 'sale_commission')->where('reference_id', $id)->delete();
-                }
-                $this->commissionService->repostCommissionLedger($log);
-                return true;
-
             case 'supplier_payment':
                 $payment = SupplierPayment::find($id);
                 if (!$payment || !$payment->supplier) {
@@ -748,8 +705,6 @@ class AccountReconciliationService
             'money_transfer' => optional(MoneyTransfer::withTrashed()->find($refId))->transfer_no ? 'Transfer ' . MoneyTransfer::withTrashed()->find($refId)->transfer_no : "Transfer #{$refId}",
             'adjustment' => "Stock Adjustment #{$refId}",
             'opening' => optional(Product::find($refId))->name ? "Product #{$refId} (" . Product::find($refId)->name . ')' : "Product #{$refId}",
-            'sale_commission' => "Commission Log #{$refId}",
-            'commission_payment' => "Agent #{$refId}",
             default => "{$type} #{$refId}",
         };
     }
