@@ -4,6 +4,44 @@ Running record of what's been built/fixed, kept for whoever (human or AI)
 picks this project up next. Newest entries first. This is a work log, not
 user-facing release notes.
 
+## 2026-08-14 (7)
+
+**Demo Mode credentials can no longer drift out of sync with reality.**
+Triggered directly by a live incident on demo.izmadts.com: the login-page
+hint showed `admin@demo.com` / `demoAdmin321`, but no account with those
+credentials actually existed - `demo_credentials_note` was always just a
+free-text `Setting` string an admin typed by hand, with nothing tying it to
+a real `User` row.
+
+- Replaced the single free-text field with two structured ones,
+  `demo_email` / `demo_password` (Settings > General > Demo Mode). Both
+  required together or both left blank (`required_with` each way) - a
+  half-filled pair would recreate the exact same confusion for a different
+  reason.
+- **Saving them now provisions the account, not just the display text**:
+  `SettingsController::updateGeneral()` calls
+  `User::updateOrCreate(['email' => $demo_email], [..., 'role' => 'admin',
+  'is_active' => true, 'approved_at' => now()])` whenever both fields are
+  present. Both `is_active` AND `approved_at` matter -
+  `User::isActive()` requires both; setting only one would silently leave
+  the account locked even with the exact right password, which is likely
+  how the original mismatch happened in the first place.
+  Changing the demo email later does not delete/deactivate the previous
+  account - deliberate, since it may have real demo activity tied to it as
+  `created_by` elsewhere.
+- Login page now also **pre-fills both fields** with the real values
+  whenever Demo Mode is active with both set, so a visitor can click Sign
+  In with no typing at all - not just see a hint and copy it manually.
+- `AppServiceProvider`'s view composer and `auth/login.blade.php` updated
+  to match (`demoEmail`/`demoPassword` instead of `demoCredentialsNote`).
+  No migration needed - both old and new are just `Setting` key/value rows.
+- Live-tested end-to-end over real HTTP: saved both fields via the actual
+  settings form, confirmed the account was created active/approved with a
+  matching password hash, confirmed the login page rendered both fields
+  pre-filled with the correct values, then submitted exactly that pre-filled
+  form and confirmed it reached `/admin/dashboard`. Fixtures removed and
+  demo_mode reset to off afterward.
+
 ## 2026-08-14 (6)
 
 **Two real bugs found via the user's own live import** (against a real

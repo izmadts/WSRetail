@@ -27,7 +27,8 @@ class SettingsController extends Controller
             // meant for the owner's own public demo install - see the
             // warning next to the toggle in the view.
             'demo_mode' => Setting::get('demo_mode', '0') === '1',
-            'demo_credentials_note' => Setting::get('demo_credentials_note', ''),
+            'demo_email' => Setting::get('demo_email', ''),
+            'demo_password' => Setting::get('demo_password', ''),
         ];
 
         // DateTimeZone::listIdentifiers() is PHP's own canonical, always-
@@ -56,7 +57,13 @@ class SettingsController extends Controller
             'theme_color' => 'required|string|in:' . implode(',', array_keys(config('themes.presets'))),
             'dark_mode_enabled' => 'nullable|boolean',
             'demo_mode' => 'nullable|boolean',
-            'demo_credentials_note' => 'nullable|string|max:255',
+            // Both required together, or both left blank - a half-filled
+            // pair (e.g. an email with no password) would show a hint on
+            // the login page for an account that either doesn't exist or
+            // has some other password, exactly the confusion this replaces
+            // a single free-text note with.
+            'demo_email' => 'nullable|required_with:demo_password|email|max:255',
+            'demo_password' => 'nullable|required_with:demo_email|string|min:6|max:255',
         ]);
 
         foreach (['app_name', 'currency_code', 'currency_symbol', 'timezone', 'date_format', 'theme_color'] as $key) {
@@ -64,7 +71,33 @@ class SettingsController extends Controller
         }
         Setting::set('dark_mode_enabled', $request->boolean('dark_mode_enabled') ? '1' : '0');
         Setting::set('demo_mode', $request->boolean('demo_mode') ? '1' : '0');
-        Setting::set('demo_credentials_note', $validated['demo_credentials_note'] ?? '');
+        Setting::set('demo_email', $validated['demo_email'] ?? '');
+        Setting::set('demo_password', $validated['demo_password'] ?? '');
+
+        // The whole point of these two fields: saving them doesn't just
+        // change what the login page DISPLAYS, it actually provisions/
+        // updates a real, active, approved admin account with those exact
+        // credentials - so what a demo visitor is told can never drift out
+        // of sync with what actually works (see the demo.izmadts.com
+        // incident this replaced the old free-text note over). Runs
+        // whenever both fields are present, independent of whether Demo
+        // Mode itself is currently toggled on, so an admin can prepare the
+        // account ahead of flipping the toggle. Changing the demo email
+        // later does NOT delete/deactivate the previous one - intentional,
+        // since it may have real demo activity tied to it as created_by
+        // elsewhere; manage/deactivate that old account by hand if needed.
+        if (!empty($validated['demo_email']) && !empty($validated['demo_password'])) {
+            \App\Models\User::updateOrCreate(
+                ['email' => $validated['demo_email']],
+                [
+                    'name' => 'Demo Admin',
+                    'password' => bcrypt($validated['demo_password']),
+                    'role' => 'admin',
+                    'is_active' => true,
+                    'approved_at' => now(),
+                ]
+            );
+        }
 
         if ($request->hasFile('logo')) {
             $oldLogo = Setting::get('logo');

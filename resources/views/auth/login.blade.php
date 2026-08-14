@@ -21,9 +21,11 @@
                 </p>
             </div>
 
-            @if(($demoMode ?? false) && !empty($demoCredentialsNote))
+            @php $demoReady = ($demoMode ?? false) && !empty($demoEmail) && !empty($demoPassword); @endphp
+            @if ($demoReady)
             <div class="rounded-xl bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 text-sm text-center">
-                <i class="fas fa-info-circle mr-1"></i> This is a demo. {{ $demoCredentialsNote }}
+                <i class="fas fa-info-circle mr-1"></i> This is a demo. Email: {{ $demoEmail }} &nbsp; Password: {{ $demoPassword }}
+                <span class="block text-xs mt-0.5">Already filled in below - just click Sign In.</span>
             </div>
             @endif
 
@@ -41,7 +43,7 @@
                             <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
                                 <i class="fas fa-envelope text-gray-400"></i>
                             </div>
-                            <input id="email" type="email" name="email" value="{{ old('email') }}" required autofocus
+                            <input id="email" type="email" name="email" value="{{ old('email', $demoReady ? $demoEmail : '') }}" required autofocus
                                 class="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent @error('email') border-red-500 @enderror"
                                 placeholder="admin@wserp.com">
                         </div>
@@ -56,7 +58,7 @@
                             Password
                         </label>
                         <div class="relative">
-                            <input :type="showPassword ? 'text' : 'password'" id="password" name="password" required
+                            <input :type="showPassword ? 'text' : 'password'" id="password" name="password" value="{{ $demoReady ? $demoPassword : '' }}" required
                                 class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 @error('password') border-red-500 @enderror"
                                 placeholder="••••••••">
                             <button type="button" @click="showPassword = !showPassword" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-blue-600">

@@ -114,18 +114,31 @@
                         <span class="text-sm font-medium text-gray-700">Demo mode</span>
                     </label>
                     <p class="mt-1 text-xs text-gray-500">
-                        Shows a credentials hint on the login page, e.g. <em>"Demo login: admin@demo.com / admin"</em>.
-                        Only turn this on for a public demo install (like demo.izmadts.com) that visitors are meant
-                        to log into freely - <strong class="text-amber-700">never enable this on a real customer's
-                        live business data.</strong>
+                        Shows a credentials hint on the login page, with the email/password fields already filled in
+                        so a visitor can just click Sign In. Only turn this on for a public demo install (like
+                        demo.izmadts.com) that visitors are meant to log into freely - <strong class="text-amber-700">
+                        never enable this on a real customer's live business data.</strong>
                     </p>
-                    <div x-show="demo" x-cloak class="mt-3">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Demo Credentials Text</label>
-                        <input type="text" name="demo_credentials_note" value="{{ old('demo_credentials_note', $settings['demo_credentials_note']) }}"
-                            placeholder="Email: admin@demo.com   Password: admin"
-                            maxlength="255"
-                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500">
-                        <p class="mt-1 text-xs text-gray-500">Shown exactly as typed on the login page. Leave blank to hide the hint even with Demo mode on.</p>
+                    <div x-show="demo" x-cloak class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Demo Login Email</label>
+                            <input type="email" name="demo_email" value="{{ old('demo_email', $settings['demo_email']) }}"
+                                placeholder="admin@demo.com" maxlength="255"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500">
+                            @error('demo_email')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Demo Login Password</label>
+                            <input type="text" name="demo_password" value="{{ old('demo_password', $settings['demo_password']) }}"
+                                placeholder="e.g. demoAdmin321" maxlength="255" minlength="6"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 font-mono">
+                            @error('demo_password')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
+                        </div>
+                        <p class="sm:col-span-2 text-xs text-gray-500">
+                            Saving this actually creates/updates a real admin account with these exact credentials -
+                            not just display text - so what's shown on the login page always works. Fill in both or
+                            leave both blank (a half-filled pair is rejected).
+                        </p>
                     </div>
                 </div>
 

@@ -109,7 +109,7 @@ class AppServiceProvider extends ServiceProvider
         View::composer(
             ['layouts.admin', 'layouts.guest', 'layouts.pos', 'auth.login', 'auth.register'],
             function ($view) {
-                $settings = Setting::whereIn('key', ['app_name', 'logo', 'favicon', 'theme_color', 'dark_mode_enabled', 'demo_mode', 'demo_credentials_note'])
+                $settings = Setting::whereIn('key', ['app_name', 'logo', 'favicon', 'theme_color', 'dark_mode_enabled', 'demo_mode', 'demo_email', 'demo_password'])
                     ->pluck('value', 'key');
                 $view->with('siteName', $settings['app_name'] ?? config('app.name'));
                 $view->with('siteLogo', $settings['logo'] ?? null);
@@ -125,7 +125,8 @@ class AppServiceProvider extends ServiceProvider
                 // fresh clones of the public repo; an admin turns it on
                 // deliberately only on the owner's own public demo instance.
                 $view->with('demoMode', ($settings['demo_mode'] ?? '0') === '1');
-                $view->with('demoCredentialsNote', $settings['demo_credentials_note'] ?? null);
+                $view->with('demoEmail', $settings['demo_email'] ?? null);
+                $view->with('demoPassword', $settings['demo_password'] ?? null);
             }
         );
     }
