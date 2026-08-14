@@ -18,7 +18,9 @@
                 <a href="#c-profile" class="block px-3 py-1.5 rounded-lg text-gray-700 hover:bg-purple-50 hover:text-purple-600"><i class="fas fa-id-card w-4 mr-1 text-gray-400"></i> Profile</a>
                 <a href="#c-categories" class="block px-3 py-1.5 rounded-lg text-gray-700 hover:bg-purple-50 hover:text-purple-600"><i class="fas fa-th-large w-4 mr-1 text-gray-400"></i> Categories</a>
                 <a href="#c-products" class="block px-3 py-1.5 rounded-lg text-gray-700 hover:bg-purple-50 hover:text-purple-600"><i class="fas fa-box w-4 mr-1 text-gray-400"></i> Products</a>
+                <a href="#c-payment-methods" class="block px-3 py-1.5 rounded-lg text-gray-700 hover:bg-purple-50 hover:text-purple-600"><i class="fas fa-credit-card w-4 mr-1 text-gray-400"></i> Payment Methods</a>
                 <a href="#c-orders" class="block px-3 py-1.5 rounded-lg text-gray-700 hover:bg-purple-50 hover:text-purple-600"><i class="fas fa-shopping-cart w-4 mr-1 text-gray-400"></i> Orders</a>
+                <a href="#c-redirects" class="block px-3 py-1.5 rounded-lg text-gray-700 hover:bg-purple-50 hover:text-purple-600"><i class="fas fa-route w-4 mr-1 text-gray-400"></i> SEO Redirects</a>
                 <a href="#c-errors" class="block px-3 py-1.5 rounded-lg text-gray-700 hover:bg-purple-50 hover:text-purple-600"><i class="fas fa-exclamation-triangle w-4 mr-1 text-gray-400"></i> Error Reference</a>
                 <a href="#c-integration" class="block px-3 py-1.5 rounded-lg text-gray-700 hover:bg-purple-50 hover:text-purple-600"><i class="fas fa-plug w-4 mr-1 text-gray-400"></i> Integration Guide</a>
             </nav>
@@ -237,9 +239,12 @@ JSON,
   "data": [
     {
       "id": 7, "code": "PRD-A1B2", "name": "Cooking Oil 5L", "category_id": 5, "category": "Groceries",
-      "description": "Refined cooking oil, 5 litre bottle.", "unit": "piece",
+      "description": "Refined cooking oil, 5 litre bottle.", "short_description": "5L cooking oil.",
+      "brand": null, "unit": "piece",
       "sale_price": 1450.00, "wholesale_price": 1300.00, "current_stock": 84.00,
-      "is_retail": true, "is_wholesale": true, "image": "uploads/products/abc123.jpg",
+      "weight": 5.2, "length": 15.0, "width": 15.0, "height": 25.0,
+      "is_retail": true, "is_wholesale": true,
+      "image": "uploads/products/abc123.jpg", "images": ["uploads/products/abc123.jpg", "uploads/products/abc124.jpg"],
       "price": 1450.00, "price_field": "sale_price"
     }
   ]
@@ -251,6 +256,30 @@ JSON,
                 URL as <code>{{ url('/') }}/&lt;image&gt;</code> (it's served directly from <code>public/</code>, not
                 behind a <code>/storage/</code> prefix).
             </p>
+        </section>
+
+        {{-- ============================================================ --}}
+        {{-- PAYMENT METHODS --}}
+        {{-- ============================================================ --}}
+        <section id="c-payment-methods" class="bg-white rounded-xl shadow-card p-6">
+            <h2 class="text-xl font-bold text-gray-900 mb-3"><i class="fas fa-credit-card text-purple-600 mr-2"></i> Payment Methods</h2>
+            <p class="text-sm text-gray-600 mb-4">
+                Checkout options configured in <strong>Settings &gt; Ecommerce &gt; Payment</strong> - not a payment
+                gateway list. Render these as the choices at checkout; whichever one the shopper picks is sent back
+                as free text in <code>payment_method</code> on <code>POST /orders</code> below.
+            </p>
+            @include('admin.system._endpoint', [
+                'base' => '/api/v1/customer', 'method' => 'GET', 'path' => '/payment-methods', 'auth' => true,
+                'description' => 'Only enabled methods, in admin-configured order.',
+                'response' => <<<'JSON'
+{
+  "success": true,
+  "data": [
+    { "id": 1, "code": "cod", "name": "Cash on Delivery", "description": "Pay in cash when your order arrives." }
+  ]
+}
+JSON,
+            ])
         </section>
 
         {{-- ============================================================ --}}
@@ -276,11 +305,13 @@ JSON,
 
             @include('admin.system._endpoint', [
                 'base' => '/api/v1/customer', 'method' => 'POST', 'path' => '/orders', 'auth' => true,
-                'description' => 'Place an order. Send product_id + quantity only - unit_price is always resolved server-side from the product\'s sale_price, never trusted from the request. Rejected with 422 if a product isn\'t available for retail or requested quantity exceeds current stock.',
+                'description' => 'Place an order. Send product_id + quantity only - unit_price is always resolved server-side from the product\'s sale_price, never trusted from the request. Rejected with 422 if a product isn\'t available for retail or requested quantity exceeds current stock. shipping_cost is computed server-side too, from Settings > Ecommerce > Shipping (a flat rate, waived once the subtotal reaches the free-shipping threshold) - it is not sent in the request body.',
                 'body' => [
                     'sale_date' => 'date, required',
                     'payment_term' => 'in: cash,credit - required. The customer\'s own choice at checkout (e.g. "Cash on Delivery" vs an account/credit order) - does NOT mean payment has already happened, it only sets the term the confirming admin will collect against.',
+                    'payment_method' => 'string, optional - free text (e.g. "Cash on Delivery", "Card"). The actual checkout method, distinct from payment_term above.',
                     'notes' => 'string, optional',
+                    'shipping_address' => 'object, optional - a point-in-time snapshot for this order only, not written back to the customer\'s saved profile address. Fields: name, address_1, address_2, city, state, postcode, country, phone (all optional strings).',
                     'items' => 'array, required, min 1 item',
                     'items.*.product_id' => 'integer, required',
                     'items.*.quantity' => 'numeric, required, min 0.01',
@@ -291,8 +322,10 @@ JSON,
   "message": "Order placed! It is pending confirmation from the admin.",
   "data": {
     "id": 231, "invoice_no": "SA-260804-00231", "source": "customer_app", "payment_term": "credit",
+    "payment_method": "Cash on Delivery", "coupon_code": null,
     "status": "draft", "status_label": "Draft",
     "sub_total": 2600.00, "total_amount": 2600.00, "paid_amount": 0, "due_amount": 2600.00,
+    "shipping_address": {"name": "Ali Raza", "address_1": "12 Mall Road", "city": "Lahore", "country": "PK"},
     "items": [ {"id":501,"product_id":7,"product_name":"Cooking Oil 5L","quantity":2,"unit_price":1300,"total_price":2600} ]
   }
 }
@@ -318,6 +351,45 @@ JSON,
                     </tbody>
                 </table>
                 <p class="text-xs text-purple-700 mt-2">This is a client-side display convention only, not a WSRetail field. If real delivery/logistics tracking (a genuine "out for delivery" step, driver assignment, etc.) becomes a real need later, that would be a separate addition to WSRetail's Sale model - not simulated by this mapping.</p>
+            </div>
+        </section>
+
+        {{-- ============================================================ --}}
+        {{-- SEO REDIRECTS --}}
+        {{-- ============================================================ --}}
+        <section id="c-redirects" class="bg-white rounded-xl shadow-card p-6">
+            <h2 class="text-xl font-bold text-gray-900 mb-3"><i class="fas fa-route text-purple-600 mr-2"></i> SEO Redirects</h2>
+            <p class="text-sm text-gray-600 mb-4">
+                When a store migrates from another CMS (e.g. WooCommerce), its old product URLs may already rank in
+                search results or be bookmarked by returning customers. Every product import automatically captures a
+                mapping from the old URL to the new product's page here - see
+                <strong>Settings &gt; Integrations &gt; SEO Redirects</strong> in the admin to browse or export them.
+                Use this endpoint to resolve one of those old URLs at request time and issue a real permanent
+                redirect, instead of letting the visitor hit a 404.
+            </p>
+
+            @include('admin.system._endpoint', [
+                'base' => '/api/v1/customer', 'method' => 'GET', 'path' => '/redirect', 'auth' => false,
+                'description' => 'Public - no customer token needed, since this has to resolve for anonymous visitors who haven\'t connected yet. Throttled (120/min).',
+                'query' => ['path' => 'string, required - the old URL\'s path only, e.g. "/product/red-t-shirt" (scheme/host are ignored if included).'],
+                'response' => <<<'JSON'
+{
+  "success": true, "message": "OK",
+  "data": { "old_path": "/product/red-t-shirt", "new_path": "/products/18", "product_id": 18 }
+}
+JSON,
+            ])
+
+            <div class="p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                <p class="text-sm text-purple-900 mb-1"><i class="fas fa-lightbulb mr-1"></i> <strong>Using it in the storefront:</strong>
+                the companion Next.js storefront's <code>app/product/[...slug]/page.tsx</code> catches WooCommerce's
+                default permalink shape (<code>/product/%postname%/</code>), calls this endpoint server-side, and
+                issues <code>permanentRedirect()</code> to the resolved <code>new_path</code> - a real HTTP redirect a
+                search engine can follow, not a client-side one. If a store used a custom permalink structure (e.g.
+                <code>/shop/%postname%/</code>), add a matching route the same way.</p>
+                <p class="text-sm text-purple-900">Not every old URL needs the storefront in the loop at all - if the
+                old domain's own web server is being retired, export a ready-to-paste rule file (.htaccess or nginx)
+                from the SEO Redirects screen instead and configure the redirect at the server/CDN level.</p>
             </div>
         </section>
 

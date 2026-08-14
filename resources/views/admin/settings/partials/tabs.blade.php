@@ -28,5 +28,9 @@
             class="px-4 py-2.5 text-sm font-medium border-b-2 transition-colors duration-150 {{ request()->routeIs('admin.settings.credit') ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700' }}">
             <i class="fas fa-credit-card mr-1"></i> Credit Settings
         </a>
+        <a href="{{ route('admin.settings.ecommerce.store') }}"
+            class="px-4 py-2.5 text-sm font-medium border-b-2 transition-colors duration-150 {{ request()->routeIs('admin.settings.ecommerce.*') ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700' }}">
+            <i class="fas fa-shopping-bag mr-1"></i> Ecommerce
+        </a>
     </nav>
 </div>

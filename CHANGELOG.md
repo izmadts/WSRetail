@@ -4,6 +4,212 @@ Running record of what's been built/fixed, kept for whoever (human or AI)
 picks this project up next. Newest entries first. This is a work log, not
 user-facing release notes.
 
+## 2026-08-14 (6)
+
+**Two real bugs found via the user's own live import** (against a real
+WooCommerce store, not a fake), both pre-existing patterns from earlier in
+the session that this surfaced for the first time:
+
+- **Misleading "0 created, 0 updated, 0 skipped" success message after a
+  real, successful commit.** `IntegrationController::commitImport()` called
+  `$service->commit($batch->fresh('items'))` - `fresh()` returns a
+  SEPARATE cloned model instance; `commit()` correctly wrote the real
+  counts onto that clone (confirmed in the DB: a real settings import had
+  actually created 1, updated 3, skipped 2), but the success-message string
+  right after read `$batch->created_count` etc from the ORIGINAL,
+  never-updated variable, which still held its just-created defaults
+  (0/0/0). Every commit of every import type (products/customers/orders/
+  settings) showed this wrong message - the data was always fine, the
+  message never was. Fixed with `$batch->refresh()` before building the
+  message. Caught only because the user reported the confusing message and
+  it was checked against the actual DB state, which told a different story.
+- **Review screen's expand/collapse arrow did nothing.** Each row's detail
+  panel was a second `<tr x-show="open">` as a SIBLING of the summary
+  `<tr x-data="{ open: false }">` - Alpine.js scope only flows to
+  descendants, so the detail row had no access to the summary row's `open`
+  state at all; clicking the chevron toggled a variable nothing was
+  listening to. Fixed by wrapping each item's pair of `<tr>`s in its own
+  `<tbody x-data="{ open: false }">` (a table can validly have multiple
+  `<tbody>` elements) so both rows share one scope. Verified via real HTTP
+  that the rendered markup nests correctly.
+
+## 2026-08-14 (5)
+
+**Full-fidelity WooCommerce import: variants, settings, and a real review
+screen.** Follow-up to the WooCommerce integration work above, addressing
+three gaps the user flagged directly: form validation/placeholders,
+incomplete review-screen data, and no way to bring over the old store's own
+settings.
+
+- **Variants/attributes are no longer flattened.** A WooCommerce "variable"
+  product's variations are now exploded into WSRetail's real
+  ProductAttribute/ProductAttributeValue/ProductVariant system - the same
+  structure the admin's own variant builder produces - instead of
+  collapsing into one simple-product row. Each variation keeps its own SKU,
+  price, stock, and image (downloaded the same way product gallery images
+  are). Only attributes marked "Used for variations" generate variants;
+  purely descriptive WooCommerce attributes (e.g. "Material: Cotton") have
+  no equivalent field in WSRetail today and are surfaced on the review
+  screen as "not imported" rather than silently dropped or faked into the
+  variant system.
+- **Real bug caught by testing**: order line items reference a *variation's*
+  SKU for a variable product (e.g. "TSHIRT-RED"), not the parent product's
+  own code ("TSHIRT"). `IntegrationImportService::commitOrder()` only ever
+  matched against `Product::code`, so every line from a variable product
+  would silently fail to match and the whole order would be rejected
+  ("No line item matched an existing product by SKU"). Fixed by checking
+  `ProductVariant::sku` first and resolving to its parent product, writing
+  both `product_id` and `product_variant_id` on the SaleItem - caught by
+  actually placing a variant-product order through the import pipeline in
+  a live test, not by inspection.
+- **Old store settings import** (Settings > Ecommerce): a new "Import
+  Settings" button pulls the old WooCommerce store's general settings
+  (address, currency), payment gateways, and shipping - staged and reviewed
+  through the exact same stage > review > commit flow as products/
+  customers/orders, not a bespoke screen. Store address/currency map into
+  `Setting`; each payment gateway maps into a `PaymentMethod` row
+  (pre-unchecked on the review screen if it was disabled on the old store);
+  shipping is approximated as WSRetail's single flat-rate + free-threshold
+  model, using the first enabled `flat_rate`/`free_shipping` method found
+  across the old store's shipping zones - explicitly flagged on the review
+  screen as an approximation, since WooCommerce supports full per-zone
+  rates and WSRetail (deliberately, see the Ecommerce Settings entry above)
+  does not. WooCommerce has no store phone/support-email field, so those
+  are left for the admin to fill in directly rather than being overwritten
+  with nothing.
+- **Review screen now shows everything that will be written**, not a
+  summary row: each row expands (click to toggle) into the full mapped
+  data - for products: description, short description, brand, weight/
+  dimensions, the old URL, every gallery image as a thumbnail, and (for
+  variable products) a full variant table with per-variant image/SKU/
+  price/stock; for customers: every address field; for orders: full
+  customer contact info, payment method, coupon, both billing and shipping
+  address snapshots, and every line item with a red-flagged
+  will-definitely-be-skipped indicator for SKU-less lines; for settings:
+  the specific fields/values about to be written, per item.
+- **Form validation/placeholder audit** across the Integrations connect
+  form and all three Ecommerce Settings tabs: added placeholders showing
+  expected formats (phone, WooCommerce key prefixes, currency amounts),
+  tightened validation (`store_phone` now regex-checked against a
+  digits/+/-/()/. pattern instead of accepting any string, shipping
+  rate/threshold capped at sane upper bounds against fat-finger typos,
+  payment method name requires a minimum length, WooCommerce API keys
+  require a minimum length as a basic sanity check). Deliberately did NOT
+  add DNS-checking email validation (`email:dns`) - inconsistent with every
+  other email field in the codebase and prone to false rejections on flaky
+  outbound DNS, so kept to the same plain `email` rule used everywhere else.
+- Live-tested via `Http::fake()`: staged and committed a variable product
+  with 2 variations (one with an image, one without - confirmed the
+  no-image one is skipped without failing the variant), confirmed
+  `ProductAttribute`/`ProductAttributeValue`/`ProductVariant` rows and the
+  downloaded variant image landed correctly; staged and committed a full
+  settings batch (general/payment/shipping) and confirmed `Setting` and
+  `PaymentMethod` rows updated correctly, including the disabled-gateway
+  pre-unchecked behavior; re-tested order commit after the SKU-matching
+  fix and confirmed both `product_id` and `product_variant_id` landed on
+  the SaleItem. Loaded the review screen for all four batch types
+  (products/customers/orders/settings) over real HTTP and grep-verified
+  the expanded detail actually renders the right data. All fixtures
+  (products, variants, attributes, customers, sales, batches, settings,
+  payment methods) removed afterward; a stray "Cash on Delivery" ->
+  "Cash on delivery" casing change from the settings-import test was
+  reverted to its original default.
+
+## 2026-08-14 (4)
+
+**Ecommerce Settings** - new tabbed settings area (Settings > Ecommerce),
+mirroring WooCommerce's own Settings tab shape for a familiar landing point
+to a store owner migrating from there. Deliberately scoped down from a full
+WooCommerce-parity settings suite (confirmed with the user):
+
+- **Store** - `storefront_url` (moved here from where it was first added
+  under Integrations > SEO Redirects, which now shows it read-only with a
+  link back to this page instead of its own duplicate form), plus
+  `store_address` / `store_phone` / `store_email`. App name/currency/
+  logo/theme stay in the existing General settings - this tab only holds
+  what's specific to the storefront-facing side.
+- **Payment** - method toggles, not a gateway integration (WSRetail has no
+  online payment processor wired up). New `payment_methods` table
+  (code/name/description/is_enabled/sort_order), seeded with Cash on
+  Delivery (enabled) and Bank Transfer (disabled) as defaults; admin can
+  rename, edit the checkout-facing description, enable/disable, add, or
+  remove methods. A shopper's pick still lands as free text on
+  `Sale::payment_method`, unchanged - this only controls what's *offered*.
+  New `GET /api/v1/customer/payment-methods` (auth required, same group as
+  `/products`/`/categories`) returns only enabled methods, documented in the
+  API docs under a new "Payment Methods" section.
+- **Shipping** - a single flat rate (`shipping_flat_rate`) plus an optional
+  free-shipping threshold (`shipping_free_threshold`), not per-zone/
+  per-city rates - a real multi-zone shipping engine is a separate, much
+  larger feature. **Actually wired into checkout**, not a dead setting:
+  `OrderController::store()` now computes `shipping_cost` server-side
+  (waived once subtotal reaches the threshold) instead of always writing 0,
+  and folds it into `total_amount`/`due_amount`. Admin-created sales (POS/
+  manual) are untouched - shipping only applies to storefront checkout.
+- Sidebar: new "Ecommerce Settings" entry; added as a tab in the shared
+  Settings tab strip (`admin.settings.partials.tabs`) alongside General/
+  Credit/etc., with its own Store/Payment/Shipping sub-tab strip on each of
+  the three pages.
+- Bug caught before it shipped: the "add payment method" form and each
+  existing method's "edit" form share one page, and the add-form originally
+  used the same field names (`name`/`description`) as the edit forms - a
+  failed add submission would flash `old('name') = ''` globally and blank
+  every row's displayed name. Fixed by namespacing the add-form's fields
+  (`new_name`/`new_description`); also guarded `PaymentMethod::code`
+  (unique) against a collision when two methods slugify to the same value.
+- Live-tested end-to-end as a throwaway admin over real HTTP: saved Store/
+  Shipping settings and confirmed the `Setting` rows landed correctly;
+  added a payment method via the admin form and confirmed only enabled
+  methods appear from the Customer API; placed two real orders through
+  `POST /api/v1/customer/orders` against a throwaway product (₨1000 each) -
+  one below the ₨3000 threshold correctly charged the ₨150 flat rate
+  (total 2150), one at/above it correctly waived shipping (total 4000).
+  Regression-checked 12 admin pages afterward; all fixtures removed.
+
+## 2026-08-14 (3)
+
+**SEO-safe URL redirects for CMS product imports.** A store migrating from
+WooCommerce (or another CMS later) may already have search ranking / indexed
+URLs / customer bookmarks pointing at its old product pages. Losing those on
+cutover is a real, avoidable cost - so every product import now captures a
+redirect from the old URL to the new one automatically, no extra admin step.
+
+- Migrations: `products.legacy_slug` (the product's slug on the *source*
+  platform - kept distinct from WSRetail's own auto-generated `slug`, which
+  `Product::boot()` always overwrites from the current name); new
+  `url_redirects` table (`old_path` unique, `new_path`, `product_id`,
+  `source`).
+- `IntegrationImportService::mapProduct()` now carries WooCommerce's `slug`
+  and full `permalink` through to `commitProduct()`, which calls the new
+  `recordRedirect()`: prefers the real permalink path (so it respects
+  whatever custom permalink structure the old store used, e.g.
+  `/shop/%postname%/`), falls back to WooCommerce's default
+  `/product/{slug}/` shape when no permalink is present. Append-only by
+  design - re-importing after a slug rename on the source store adds a new
+  `old_path` rather than overwriting a previously captured one, since the
+  older URL may still be indexed/bookmarked too.
+- New public (no customer token, throttled) endpoint
+  `GET /api/v1/customer/redirect?path=...` resolves an old path to
+  `{old_path, new_path, product_id}` - has to be public since it must
+  resolve for an anonymous visitor who followed an old link before any
+  `/connect` has happened. Documented in the API docs (new "SEO Redirects"
+  section).
+- Storefront wiring: `wsretail-storefront/app/product/[...slug]/page.tsx`
+  catches WooCommerce's default permalink shape, calls the lookup endpoint
+  server-side, and issues a real `permanentRedirect()` (HTTP 308) - not a
+  client-side redirect, which search engines don't credit the same way.
+- Admin UI: Settings > Integrations > SEO Redirects - lists every captured
+  redirect, lets the admin set a `storefront_url` setting (used to build
+  full URLs in exports), and exports a ready-to-paste `.htaccess` or
+  `nginx.conf` rule file for stores that will point their *old* domain's web
+  server/CDN straight at the new one rather than routing traffic through the
+  Next.js app at all.
+- Live-tested via `Http::fake()` (staged + committed a fake WooCommerce
+  product with a custom permalink, confirmed `legacy_slug` and the
+  `url_redirects` row landed correctly) and via real HTTP (the public lookup
+  endpoint through the license-gated API, the admin redirects page, and both
+  export formats) as a throwaway admin; fixtures removed afterward.
+
 > **Note:** WSRetail was cloned from WSERP with the Golden Club (loyalty/
 > rewards/referral) module intentionally left out — this is a POS/retail
 > build, not a loyalty platform. Entries below that came from the WSERP
@@ -11,6 +217,155 @@ user-facing release notes.
 > Sale Agent/Vendor mobile apps) have been removed since none of that code
 > exists in this codebase. Everything else — reporting, credit/stock
 > settings, bug fixes, UI fixes — applies here too and is kept as-is.
+
+## 2026-08-14 (2)
+
+**Standard e-commerce field audit**, prompted by "make sure standard
+product/customer/order fields exist in our database" before more CMS
+connectors get built on top of gaps. Compared WSRetail's schema against
+what WooCommerce/Shopify/Magento all commonly expose and closed the real
+gaps - not a redesign, just making sure the data has somewhere to go.
+
+**New product fields**: `short_description`, `brand` (nullable - no core
+WooCommerce field maps to it, but Shopify's `vendor` will), `weight`,
+`length`, `width`, `height`. New `product_images` table + `Product::images()`
+- the single `image` column stays the primary/thumbnail everywhere it's
+already used, `images` is the rest of the gallery every platform actually
+has (WSRetail only ever had room for one).
+
+**New customer field**: `address_2` (apartment/suite line - every platform
+splits this from the main address line; WSRetail only had one).
+
+**New sale fields**: `payment_method` (the actual checkout method/gateway
+name, e.g. "Cash on Delivery" - distinct from `payment_term`'s cash/credit
+accounting classification), `coupon_code`, `billing_address` +
+`shipping_address` (JSON, a point-in-time snapshot of the order's own
+address - deliberately NOT a live reference to the customer's saved
+address, since a customer's profile address can change later without
+rewriting what was actually shipped where on old orders, and a guest/one-
+off order's ship-to may never have matched any saved customer address).
+
+**Deliberately NOT added**, and why: a per-order **currency** column
+(WSRetail's accounting is single-currency throughout - a stored-but-unused
+field would be actively misleading); **multiple categories per product**
+or a full **multi-address address-book per customer** (both are real
+things WooCommerce/Shopify/Magento support, but both are structural
+features - many-to-many category assignment, a proper address book with
+default billing/shipping flags - not a missing-column fix, and would touch
+most of the existing product/customer UI). Both are flagged here as known,
+deliberate v1 simplifications rather than silently unhandled.
+
+**Wired all the way through, not just added as empty columns** (per
+explicit ask - "I want all the data mapped correctly"):
+- `IntegrationImportService`'s WooCommerce product mapper now populates
+  description (HTML-stripped AND entity-decoded - caught `&amp;` staying
+  literal after just stripping tags, fixed with `html_entity_decode`),
+  short_description, weight, and dimensions, all natively present on a
+  core WooCommerce product.
+- **Product images are now actually downloaded**, not just schema-ready:
+  fetched per URL (capped at 8/product), stored via the exact same
+  `public_path('uploads/products')` convention `ProductController`'s own
+  manual upload already uses (so imported and manually-uuploaded images
+  render through the identical `asset()` path), one bad image logged and
+  skipped rather than failing the whole product. Found and fixed a real
+  bug here too: `Response::header('Content-Type', '')` - Laravel's HTTP
+  client `header()` only takes one argument, so the fallback default was
+  silently ignored, and a response with no Content-Type header would have
+  fed `null` into `str_starts_with()` (deprecated/unsafe in PHP 8.1+).
+  Fixed to `header('Content-Type') ?? ''`.
+- Order mapper now captures `payment_method_title`, the first
+  `coupon_lines[].code`, and full `billing`/`shipping` address blocks.
+- **Customer/Storefront API updated to match**: `ProductResource` exposes
+  short_description/brand/weight/dimensions/images; `SaleResource` exposes
+  payment_method/coupon_code/billing_address/shipping_address/
+  external_order_id; `CustomerProfileResource` exposes address_2.
+  `AuthController::connect()`/`updateProfile()` now accept address_2/state/
+  country (previously in the resource output but not actually settable).
+  `OrderController::store()` now accepts an optional `payment_method` and a
+  `shipping_address` snapshot at checkout time, matching the same shape
+  used for imported orders. API Documentation page updated to match (stale
+  docs would just recreate the exact mismatch risk this whole audit was
+  about).
+- Live-tested the full chain end to end via `Http::fake()`: product with 2
+  real (fake-byte) images actually downloaded to disk and readable,
+  description entity-decoding, customer address_2, order payment_method/
+  coupon/both addresses - then via *real* HTTP against the running app:
+  `/connect` with address_2, `/products` showing every new field, and a
+  full `/orders` POST with `payment_method` + `shipping_address` returning
+  correctly. All fixtures (test images on disk included) deleted after.
+
+## 2026-08-14
+
+**WooCommerce integration - one-time product/customer/order import.** New
+Settings > Integrations hub (`admin.integrations.*`, role:admin, own
+top-level route prefix rather than nested under Settings since it has a
+multi-step flow, not a simple settings form). WooCommerce is the only
+working connector in v1 (Shopify/Magento/WhatsApp/SMS show as "Coming soon"
+cards, same grid, so the hub's shape doesn't change when they're built).
+Scope was deliberately narrowed from the original idea (raw CMS import for
+Woo/Shopify/Magento + WhatsApp/SMS) to a one-time import, WooCommerce first,
+after weighing it with the user - live two-way sync is a fundamentally
+different, much larger build (webhook/polling infra, conflict resolution
+when both sides can change stock) and not what was needed first.
+
+- **New tables**: `integrations` (one row per platform, credentials
+  encrypted at rest via `Crypt::encryptString` in `Integration`'s
+  accessor/mutator, confirmed via raw DB read that the column holds
+  ciphertext, not plaintext), `import_batches` + `import_batch_items` (a
+  staging area - fetched WooCommerce rows land here first, mapped to
+  WSRetail's field shape and matched against existing records, and nothing
+  touches real `Product`/`Customer`/`Sale` rows until an admin reviews and
+  confirms). `sales.external_order_id` (nullable, unique per `source`) so a
+  re-import recognizes an already-imported order instead of duplicating it.
+- **`WooCommerceClient`**: thin wrapper on the WooCommerce REST API v3,
+  Basic Auth (consumer key/secret), rejects a non-`https://` site URL up
+  front since WooCommerce silently rejects Basic Auth over plain HTTP.
+- **`IntegrationImportService`**: fetch+stage+match for all three types,
+  plus commit. Products match on SKU→`code` (falls back to `WC-{id}` when a
+  WooCommerce product has no SKU, since `products.code` is unique/required
+  and can't be blank); customers match on email-then-phone; orders dedup by
+  `(source, external_order_id)` and are never "updated" on re-import (once
+  a sale exists, further changes go through the admin UI, not a re-run
+  import silently touching a possibly already-confirmed/posted sale).
+  Deliberate v1 scope cuts, called out in the code: variable WooCommerce
+  products import as simple products using their own price/stock (not
+  exploded into WSRetail's Size/Color variant system); product images
+  aren't downloaded, only SKU/name/price/stock/category.
+- **Review screen**: every staged row, checkbox to include/exclude,
+  new-vs-update-vs-already-imported badges. Caught and fixed a real bug
+  before it shipped - the first version paginated this screen, but the
+  commit form only submits checkboxes for whatever page is currently in the
+  DOM, so any item on a page the admin never visited would've been silently
+  excluded on commit. Removed pagination there entirely; a large catalog is
+  now a long scroll instead of a data-loss bug.
+- **"E-commerce Store Orders"** under Sales (`admin.sales.ecommerce`) -
+  same `Sale`/`SaleItem` records as everything else (not a parallel order
+  system), just filtered to `source NOT IN ('web','pos','customer_app')`,
+  with an added Store Order # and platform-badge column. Route registered
+  before the `/{sale}` wildcard in `routes/web.php` (same reason `/create`
+  and `/pos` already are) so `/sales/ecommerce` doesn't get swallowed as a
+  `{sale}` id.
+- **Bug found and fixed via live testing**: `Sale::$fillable` was missing
+  `external_order_id` - the exact same mass-assignment class of bug as the
+  `StockMovement::$fillable` miss earlier this session. First end-to-end
+  test run showed the sale, customer, and items all committing correctly
+  but `external_order_id` silently landing as `NULL`, which would have
+  broken re-import dedup for every customer using this feature. Added it to
+  `$fillable`, re-ran the full pipeline to confirm the fix.
+- **Live-tested end to end** against `Http::fake()`-simulated WooCommerce
+  responses (no real WooCommerce store available in this environment): full
+  connect → stage → commit for all three types; re-running the import
+  afterward correctly matched existing products for update and skipped the
+  already-imported order rather than duplicating anything; verified the
+  connect/disconnect controller actions and credential encryption directly;
+  verified every new page (hub, review, connected-state, E-commerce Orders
+  empty state) over real HTTP as a logged-in admin. All throwaway
+  fixtures (test user, integration row, products/customers/sales, import
+  batches) deleted afterward.
+- Also rebuilt `public/build/` twice more (`npm run build`) for new
+  Tailwind classes this UI introduced (`opacity-60`, `capitalize`, plus the
+  purple/gray badge colors) not yet in the compiled bundle - same recurring
+  gotcha noted in the two previous entries.
 
 ## 2026-08-13 (7)
 

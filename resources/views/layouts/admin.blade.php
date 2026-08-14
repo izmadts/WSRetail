@@ -157,6 +157,7 @@
                             'links' => [
                                 ['route' => 'admin.customers.index', 'is' => 'admin.customers.*', 'icon' => 'fa-users', 'label' => 'Customers', 'module' => 'customers'],
                                 ['route' => 'admin.sales.index', 'is' => 'admin.sales.*', 'icon' => 'fa-shopping-bag', 'label' => 'Sales', 'module' => 'sales'],
+                                ['route' => 'admin.sales.ecommerce', 'is' => 'admin.sales.ecommerce', 'icon' => 'fa-store', 'label' => 'E-commerce Store Orders', 'module' => 'sales'],
                                 ['route' => 'admin.sales-returns.index', 'is' => 'admin.sales-returns.*', 'icon' => 'fa-undo-alt', 'label' => 'Sales Returns', 'module' => 'sales-returns'],
                             ],
                         ],
@@ -229,7 +230,7 @@
                     if (auth()->user() && auth()->user()->isAdmin()) {
                         $sidebarSections[] = [
                             'key' => 'settings', 'label' => 'Settings', 'icon' => 'fa-cog', 'color' => 'text-gray-500',
-                            'active' => request()->routeIs('admin.settings.*'),
+                            'active' => request()->routeIs('admin.settings.*', 'admin.integrations.*'),
                             'links' => [
                                 ['route' => 'admin.settings.general', 'is' => 'admin.settings.general', 'icon' => 'fa-sliders-h', 'label' => 'General'],
                                 ['route' => 'admin.settings.customer-groups.index', 'is' => 'admin.settings.customer-groups.*', 'icon' => 'fa-layer-group', 'label' => 'Customer Groups'],
@@ -238,6 +239,8 @@
                                 ['route' => 'admin.settings.users.index', 'is' => 'admin.settings.users.*', 'icon' => 'fa-users-cog', 'label' => 'Users'],
                                 ['route' => 'admin.settings.permissions.index', 'is' => 'admin.settings.permissions.*', 'icon' => 'fa-shield-alt', 'label' => 'Permissions'],
                                 ['route' => 'admin.settings.credit', 'is' => 'admin.settings.credit', 'icon' => 'fa-credit-card', 'label' => 'Credit Settings'],
+                                ['route' => 'admin.settings.ecommerce.store', 'is' => 'admin.settings.ecommerce.*', 'icon' => 'fa-shopping-bag', 'label' => 'Ecommerce Settings'],
+                                ['route' => 'admin.integrations.index', 'is' => 'admin.integrations.*', 'icon' => 'fa-plug', 'label' => 'Integrations'],
                                 ['route' => 'admin.license.index', 'is' => 'admin.license.index', 'icon' => 'fa-key', 'label' => 'License'],
                             ],
                         ];

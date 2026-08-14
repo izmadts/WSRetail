@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\LicenseController;
+use App\Http\Controllers\Admin\IntegrationController;
 use App\Http\Controllers\Admin\AccountController;
 use App\Http\Controllers\Admin\CategoryController;
 use App\Http\Controllers\Admin\ProductController;
@@ -28,6 +29,7 @@ use App\Http\Controllers\Admin\BackupController;
 use App\Http\Controllers\Admin\ExportController;
 use App\Http\Controllers\Admin\ActivityLogController;
 use App\Http\Controllers\Admin\SettingsController;
+use App\Http\Controllers\Admin\EcommerceSettingsController;
 use App\Http\Controllers\Admin\ApiSystemController;
 use App\Http\Controllers\Admin\CustomerGroupController;
 use App\Http\Controllers\Admin\LocationController;
@@ -314,6 +316,9 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin,manager,
         Route::get('/', [SaleController::class, 'index'])->name('index');
         Route::get('/create', [SaleController::class, 'create'])->middleware('permission:sales,create')->name('create');
         Route::get('/pos', [SaleController::class, 'pos'])->middleware('permission:sales,create')->name('pos');
+        // Must stay before the /{sale} wildcard below, same as /create and
+        // /pos above, or "ecommerce" would be swallowed as a {sale} id.
+        Route::get('/ecommerce', [SaleController::class, 'ecommerceOrders'])->name('ecommerce');
         Route::post('/', [SaleController::class, 'store'])->middleware('permission:sales,create')->name('store');
         Route::get('/{sale}', [SaleController::class, 'show'])->name('show');
         Route::get('/{sale}/receipt', [SaleController::class, 'receipt'])->name('receipt');
@@ -571,6 +576,44 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin,manager,
 
         Route::get('/pos', [PosSettingController::class, 'edit'])->name('pos.edit');
         Route::post('/pos', [PosSettingController::class, 'update'])->name('pos.update');
+
+        // Ecommerce: Store / Payment / Shipping - see EcommerceSettingsController.
+        Route::prefix('ecommerce')->name('ecommerce.')->group(function () {
+            Route::get('/store', [EcommerceSettingsController::class, 'store'])->name('store');
+            Route::post('/store', [EcommerceSettingsController::class, 'updateStore'])->name('store.update');
+
+            Route::get('/payment', [EcommerceSettingsController::class, 'payment'])->name('payment');
+            Route::post('/payment', [EcommerceSettingsController::class, 'storePaymentMethod'])->name('payment.store');
+            Route::put('/payment/{paymentMethod}', [EcommerceSettingsController::class, 'updatePaymentMethod'])->name('payment.update');
+            Route::delete('/payment/{paymentMethod}', [EcommerceSettingsController::class, 'destroyPaymentMethod'])->name('payment.destroy');
+
+            Route::get('/shipping', [EcommerceSettingsController::class, 'shipping'])->name('shipping');
+            Route::post('/shipping', [EcommerceSettingsController::class, 'updateShipping'])->name('shipping.update');
+        });
+    });
+
+    // ==========================================
+    // 23b. INTEGRATIONS (admin-only) - CMS/marketplace connectors
+    // (WooCommerce v1; Shopify/Magento/WhatsApp/SMS shown as coming-soon
+    // cards). Own top-level prefix rather than nested under settings/ since
+    // it has its own multi-step import flow (stage -> review -> commit),
+    // not a simple settings form.
+    // ==========================================
+    Route::prefix('integrations')->name('integrations.')->middleware('role:admin')->group(function () {
+        Route::get('/', [IntegrationController::class, 'index'])->name('index');
+        Route::post('/woocommerce/connect', [IntegrationController::class, 'connectWooCommerce'])->name('woocommerce.connect');
+        Route::post('/woocommerce/disconnect', [IntegrationController::class, 'disconnectWooCommerce'])->name('woocommerce.disconnect');
+        Route::post('/woocommerce/import/{type}', [IntegrationController::class, 'stageImport'])->name('woocommerce.import');
+
+        Route::get('/imports/{batch}', [IntegrationController::class, 'reviewImport'])->name('imports.review');
+        Route::post('/imports/{batch}/commit', [IntegrationController::class, 'commitImport'])->name('imports.commit');
+        Route::post('/imports/{batch}/cancel', [IntegrationController::class, 'cancelImport'])->name('imports.cancel');
+
+        // SEO redirects captured during product imports (old store URL ->
+        // new WSRetail product page) - see IntegrationImportService::
+        // recordRedirect() and the public /api/v1/customer/redirect lookup.
+        Route::get('/redirects', [IntegrationController::class, 'redirects'])->name('redirects');
+        Route::get('/redirects/export/{format}', [IntegrationController::class, 'exportRedirects'])->name('redirects.export');
     });
 
     // ==========================================

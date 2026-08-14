@@ -11,10 +11,11 @@ class Sale extends Model
     use SoftDeletes;
 
     protected $fillable = [
-        'invoice_no', 'customer_id', 'location_id', 'source', 'sale_date', 'due_date',
-        'payment_term', 'status', 'sub_total', 'discount', 'discount_type',
+        'invoice_no', 'customer_id', 'location_id', 'source', 'external_order_id', 'sale_date', 'due_date',
+        'payment_term', 'payment_method', 'status', 'sub_total', 'discount', 'discount_type', 'coupon_code',
         'tax', 'shipping_cost', 'total_amount',
-        'paid_amount', 'due_amount', 'refunded_amount', 'notes', 'created_by'
+        'paid_amount', 'due_amount', 'refunded_amount', 'notes',
+        'billing_address', 'shipping_address', 'created_by'
     ];
 
     protected $casts = [
@@ -28,6 +29,8 @@ class Sale extends Model
         'paid_amount' => 'decimal:2',
         'due_amount' => 'decimal:2',
         'refunded_amount' => 'decimal:2',
+        'billing_address' => 'array',
+        'shipping_address' => 'array',
     ];
 
     protected static function boot()

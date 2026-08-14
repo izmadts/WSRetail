@@ -20,6 +20,7 @@ class CustomerProfileResource extends JsonResource
             'phone' => $this->phone,
             'mobile' => $this->mobile,
             'address' => $this->address,
+            'address_2' => $this->address_2,
             'city' => $this->city,
             'state' => $this->state,
             'country' => $this->country,

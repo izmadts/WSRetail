@@ -5,6 +5,8 @@ use App\Http\Controllers\Api\Customer\AuthController;
 use App\Http\Controllers\Api\Customer\ProductController;
 use App\Http\Controllers\Api\Customer\CategoryController;
 use App\Http\Controllers\Api\Customer\OrderController;
+use App\Http\Controllers\Api\Customer\RedirectController;
+use App\Http\Controllers\Api\Customer\PaymentMethodController;
 
 // ============================================================
 // CUSTOMER / STOREFRONT API - /api/v1/customer/*
@@ -22,6 +24,13 @@ Route::prefix('customer')->name('api.customer.')->group(function () {
         ->middleware(['integration.key', 'throttle:30,1'])
         ->name('connect');
 
+    // ---- Public: no auth, no integration key - old-store SEO URL lookup.
+    // Not sensitive (equivalent to what a public web server's own redirect
+    // map would expose), just throttled against abuse. ----
+    Route::get('/redirect', [RedirectController::class, 'lookup'])
+        ->middleware('throttle:120,1')
+        ->name('redirect.lookup');
+
     // ---- Authenticated as one specific customer + must be active ----
     Route::middleware(['auth:sanctum', 'customer.active'])->group(function () {
 
@@ -31,6 +40,7 @@ Route::prefix('customer')->name('api.customer.')->group(function () {
 
         Route::get('/categories', [CategoryController::class, 'index'])->name('categories.index');
         Route::get('/products', [ProductController::class, 'index'])->name('products.index');
+        Route::get('/payment-methods', [PaymentMethodController::class, 'index'])->name('payment-methods.index');
 
         Route::get('/orders', [OrderController::class, 'index'])->name('orders.index');
         Route::post('/orders', [OrderController::class, 'store'])->name('orders.store');

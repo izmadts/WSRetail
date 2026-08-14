@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Customer;
 
 use App\Models\Sale;
 use App\Models\Product;
+use App\Models\Setting;
 use App\Http\Resources\Api\SaleResource;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -66,12 +67,47 @@ class OrderController extends ApiController
         ];
     }
 
+    /**
+     * Settings > Ecommerce > Shipping: a single flat rate, waived once the
+     * order subtotal reaches the free-shipping threshold (0/blank
+     * threshold = never free). Admin-created sales (POS/manual) never call
+     * this - shipping only applies to storefront checkout.
+     */
+    private function calculateShipping(float $subTotal): float
+    {
+        $threshold = Setting::get('shipping_free_threshold', '');
+        if ($threshold !== '' && $threshold !== null && $subTotal >= (float) $threshold) {
+            return 0.0;
+        }
+
+        return (float) Setting::get('shipping_flat_rate', 0);
+    }
+
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
             'sale_date' => 'required|date',
             'payment_term' => 'required|in:cash,credit',
+            // The checkout method the shopper picked (e.g. "Cash on
+            // Delivery", "Card") - free text, not an accounting field.
+            // Distinct from payment_term, which only classifies cash-vs-
+            // credit for the ledger.
+            'payment_method' => 'nullable|string|max:100',
             'notes' => 'nullable|string',
+            // Optional - a shopper checking out with a different ship-to
+            // than their saved profile address. Stored as a point-in-time
+            // snapshot on the order, same shape used for imported orders
+            // (see IntegrationImportService), not written back to the
+            // Customer's own saved address.
+            'shipping_address' => 'nullable|array',
+            'shipping_address.name' => 'nullable|string|max:255',
+            'shipping_address.address_1' => 'nullable|string|max:255',
+            'shipping_address.address_2' => 'nullable|string|max:255',
+            'shipping_address.city' => 'nullable|string|max:100',
+            'shipping_address.state' => 'nullable|string|max:100',
+            'shipping_address.postcode' => 'nullable|string|max:20',
+            'shipping_address.country' => 'nullable|string|max:100',
+            'shipping_address.phone' => 'nullable|string|max:50',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|integer|exists:products,id',
             'items.*.quantity' => 'required|numeric|min:0.01',
@@ -119,7 +155,10 @@ class OrderController extends ApiController
             ];
         }
 
-        $sale = DB::transaction(function () use ($customer, $validated, $itemsData, $subTotal) {
+        $shippingCost = $this->calculateShipping($subTotal);
+        $total = $subTotal + $shippingCost;
+
+        $sale = DB::transaction(function () use ($customer, $validated, $itemsData, $subTotal, $shippingCost, $total) {
             $sale = Sale::create([
                 'customer_id' => $customer->id,
                 'source' => 'customer_app',
@@ -130,15 +169,17 @@ class OrderController extends ApiController
                 // toward partial/paid; picking "cash" here does not imply
                 // payment has already happened.
                 'payment_term' => $validated['payment_term'],
+                'payment_method' => $validated['payment_method'] ?? null,
                 'status' => 'draft',
                 'sub_total' => $subTotal,
                 'discount' => 0,
                 'tax' => 0,
-                'shipping_cost' => 0,
-                'total_amount' => $subTotal,
+                'shipping_cost' => $shippingCost,
+                'total_amount' => $total,
                 'paid_amount' => 0,
-                'due_amount' => $subTotal,
+                'due_amount' => $total,
                 'notes' => $validated['notes'] ?? null,
+                'shipping_address' => $validated['shipping_address'] ?? null,
                 'created_by' => null,
             ]);
 

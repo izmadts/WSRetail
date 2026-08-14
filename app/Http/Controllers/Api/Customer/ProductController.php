@@ -17,7 +17,7 @@ class ProductController extends ApiController
     {
         $query = Product::active()->inStock()
             ->where('is_retail', true)
-            ->with('category', 'variants')
+            ->with('category', 'variants', 'images')
             ->orderBy('name');
 
         if ($request->filled('search')) {

@@ -19,7 +19,14 @@ class SaleResource extends JsonResource
             ] : null),
             'sale_date' => optional($this->sale_date)->format('Y-m-d'),
             'payment_term' => $this->payment_term,
+            // The order's own payment gateway/method (e.g. "Cash on
+            // Delivery", "PayPal") - not to be confused with each
+            // payments[].payment_method entry below, which is how a
+            // specific collected payment was recorded internally.
+            'payment_method' => $this->payment_method,
+            'coupon_code' => $this->coupon_code,
             'source' => $this->source,
+            'external_order_id' => $this->external_order_id,
             'status' => $this->status,
             'status_label' => $this->status_label,
             'status_color' => $this->status_color,
@@ -32,6 +39,8 @@ class SaleResource extends JsonResource
             'paid_amount' => (float) $this->paid_amount,
             'due_amount' => (float) $this->due_amount,
             'notes' => $this->notes,
+            'billing_address' => $this->billing_address,
+            'shipping_address' => $this->shipping_address,
             'items' => $this->whenLoaded('items', fn () => $this->items->map(fn ($item) => [
                 'id' => $item->id,
                 'product_id' => $item->product_id,

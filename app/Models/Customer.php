@@ -27,6 +27,7 @@ class Customer extends Authenticatable
         'phone',
         'mobile',
         'address',
+        'address_2',
         'city',
         'state',
         'country',

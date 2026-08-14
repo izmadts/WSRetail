@@ -12,10 +12,12 @@ class Product extends Model
 
 
     protected $fillable = [
-        'code', 'name', 'slug', 'category_id', 'unit',
+        'code', 'name', 'slug', 'legacy_slug', 'category_id', 'unit',
         'purchase_price', 'sale_price', 'wholesale_price',
         'current_stock', 'min_stock_level', 'max_stock_level',
-        'barcode', 'description', 'image', 'is_active',
+        'barcode', 'description', 'short_description', 'brand',
+        'weight', 'length', 'width', 'height',
+        'image', 'is_active',
         'is_retail', 'is_wholesale', 'has_variants',
     ];
 
@@ -26,6 +28,10 @@ class Product extends Model
         'current_stock' => 'decimal:2',
         'min_stock_level' => 'decimal:2',
         'max_stock_level' => 'decimal:2',
+        'weight' => 'decimal:3',
+        'length' => 'decimal:2',
+        'width' => 'decimal:2',
+        'height' => 'decimal:2',
         'is_active' => 'boolean',
         'is_retail' => 'boolean',
         'is_wholesale' => 'boolean',
@@ -72,6 +78,21 @@ class Product extends Model
     public function stockMovements()
     {
         return $this->hasMany(StockMovement::class);
+    }
+
+    // The single 'image' column stays the primary/thumbnail everything
+    // already reads; this is the rest of the gallery (see product_images
+    // migration - most e-commerce CMSs expose multiple product images).
+    public function images()
+    {
+        return $this->hasMany(ProductImage::class)->orderBy('sort_order');
+    }
+
+    // Old-store URLs (e.g. WooCommerce permalinks) that now 301 to this
+    // product's WSRetail storefront page - see UrlRedirect.
+    public function redirects()
+    {
+        return $this->hasMany(UrlRedirect::class);
     }
 
     public function saleItems()

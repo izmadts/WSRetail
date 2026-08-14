@@ -40,6 +40,22 @@ class SaleController extends Controller
         return view('admin.sales.index', compact('sales'));
     }
 
+    /**
+     * Sales imported from a connected e-commerce platform (see
+     * Settings > Integrations) - same Sale/SaleItem records as everything
+     * else, just filtered to source != the normal in-app channels so an
+     * admin can see what came in from WooCommerce etc. at a glance.
+     */
+    public function ecommerceOrders()
+    {
+        $sales = Sale::whereNotIn('source', ['web', 'pos', 'customer_app'])
+            ->with('customer', 'createdBy')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return view('admin.sales.ecommerce', compact('sales'));
+    }
+
     public function create()
     {
         if (Auth::user()->isPosManager()) {
