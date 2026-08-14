@@ -62,7 +62,7 @@ return [
     // Remote license-validation server this install activates/checks in
     // against. See App\Services\LicenseService.
     'license_server' => [
-        'url' => env('LICENSE_SERVER_URL', 'https://license.wsretail.example.com'),
+        'url' => env('LICENSE_SERVER_URL', 'https://lic.izmadts.com'),
         'grace_days' => env('LICENSE_GRACE_DAYS', 7),
         'timeout' => env('LICENSE_HTTP_TIMEOUT', 5),
         'recheck_interval_hours' => env('LICENSE_RECHECK_INTERVAL_HOURS', 6),
