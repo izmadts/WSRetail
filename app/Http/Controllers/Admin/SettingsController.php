@@ -37,8 +37,9 @@ class SettingsController extends Controller
         // is something PHP/Carbon can actually parse.
         $timezones = \DateTimeZone::listIdentifiers();
         $themes = config('themes.presets');
+        $isDemoAccount = auth()->user()->isDemoAccount();
 
-        return view('admin.settings.general', compact('settings', 'timezones', 'themes'));
+        return view('admin.settings.general', compact('settings', 'timezones', 'themes', 'isDemoAccount'));
     }
 
     public function updateGeneral(Request $request)
@@ -70,33 +71,46 @@ class SettingsController extends Controller
             Setting::set($key, $validated[$key]);
         }
         Setting::set('dark_mode_enabled', $request->boolean('dark_mode_enabled') ? '1' : '0');
-        Setting::set('demo_mode', $request->boolean('demo_mode') ? '1' : '0');
-        Setting::set('demo_email', $validated['demo_email'] ?? '');
-        Setting::set('demo_password', $validated['demo_password'] ?? '');
 
-        // The whole point of these two fields: saving them doesn't just
-        // change what the login page DISPLAYS, it actually provisions/
-        // updates a real, active, approved admin account with those exact
-        // credentials - so what a demo visitor is told can never drift out
-        // of sync with what actually works (see the demo.izmadts.com
-        // incident this replaced the old free-text note over). Runs
-        // whenever both fields are present, independent of whether Demo
-        // Mode itself is currently toggled on, so an admin can prepare the
-        // account ahead of flipping the toggle. Changing the demo email
-        // later does NOT delete/deactivate the previous one - intentional,
-        // since it may have real demo activity tied to it as created_by
-        // elsewhere; manage/deactivate that old account by hand if needed.
-        if (!empty($validated['demo_email']) && !empty($validated['demo_password'])) {
-            \App\Models\User::updateOrCreate(
-                ['email' => $validated['demo_email']],
-                [
-                    'name' => 'Demo Admin',
-                    'password' => bcrypt($validated['demo_password']),
-                    'role' => 'admin',
-                    'is_active' => true,
-                    'approved_at' => now(),
-                ]
-            );
+        // The Demo Mode block (toggle + credentials) is off-limits to the
+        // demo account itself - enforced HERE, not just hidden in the view,
+        // since a demo visitor could otherwise POST directly to this route
+        // bypassing a hidden form section. Whatever was submitted for these
+        // three fields is silently ignored (not rejected - the rest of the
+        // form, e.g. app_name/theme, still saves fine for a demo visitor)
+        // so a demo user can never disable the demo or change its own login
+        // and lock out whoever visits next.
+        if (!auth()->user()->isDemoAccount()) {
+            Setting::set('demo_mode', $request->boolean('demo_mode') ? '1' : '0');
+            Setting::set('demo_email', $validated['demo_email'] ?? '');
+            Setting::set('demo_password', $validated['demo_password'] ?? '');
+
+            // The whole point of these two fields: saving them doesn't just
+            // change what the login page DISPLAYS, it actually provisions/
+            // updates a real, active, approved admin account with those
+            // exact credentials - so what a demo visitor is told can never
+            // drift out of sync with what actually works (see the
+            // demo.izmadts.com incident this replaced the old free-text
+            // note over). Runs whenever both fields are present,
+            // independent of whether Demo Mode itself is currently toggled
+            // on, so an admin can prepare the account ahead of flipping the
+            // toggle. Changing the demo email later does NOT delete/
+            // deactivate the previous one - intentional, since it may have
+            // real demo activity tied to it as created_by elsewhere; manage/
+            // deactivate that old account by hand if needed.
+            if (!empty($validated['demo_email']) && !empty($validated['demo_password'])) {
+                \App\Models\User::updateOrCreate(
+                    ['email' => $validated['demo_email']],
+                    [
+                        'name' => 'Demo Admin',
+                        'password' => bcrypt($validated['demo_password']),
+                        'role' => 'admin',
+                        'is_demo_account' => true,
+                        'is_active' => true,
+                        'approved_at' => now(),
+                    ]
+                );
+            }
         }
 
         if ($request->hasFile('logo')) {

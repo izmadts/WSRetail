@@ -4,6 +4,44 @@ Running record of what's been built/fixed, kept for whoever (human or AI)
 picks this project up next. Newest entries first. This is a work log, not
 user-facing release notes.
 
+## 2026-08-14 (8)
+
+**The demo account can no longer touch its own Demo Mode configuration.**
+Follow-up to the demo-credentials provisioning fix above - a demo visitor
+logging in with role=admin (needed so the demo actually showcases the
+software) could otherwise disable Demo Mode or change the demo's own
+login and lock out the next visitor.
+
+- New `users.is_demo_account` boolean (migration + `User::isDemoAccount()`
+  helper) - set `true` only on the account Settings > General > Demo Mode
+  itself provisions. Distinct from `role`, since the demo account still
+  needs full `role=admin` capability everywhere else to be a real
+  demonstration of the product.
+- **Enforced server-side**, not just hidden in the view -
+  `SettingsController::updateGeneral()` silently ignores `demo_mode`/
+  `demo_email`/`demo_password` from the request whenever the authenticated
+  user is a demo account, regardless of what's actually submitted. Every
+  other field on that same form (app name, currency, theme, etc.) still
+  saves normally - only the three demo-specific keys and the account
+  re-provisioning step are skipped. This matters because a hidden form
+  section is only a UI nicety; the real boundary has to be in the
+  controller, since nothing stops a demo user from POSTing directly to the
+  route with the fields included by hand.
+- The Demo Mode block itself (toggle + both credential fields) is hidden
+  entirely from Settings > General's view for a demo account
+  (`@unless($isDemoAccount)`) - not just disabled inputs, which would still
+  reveal the current values.
+- Live-tested over real HTTP as both roles: logged in as a flagged demo
+  account and POSTed a direct attempt to disable Demo Mode, hijack the
+  credentials to `hacker@evil.com`, and change `app_name` in the same
+  request - confirmed `app_name` changed (proving the rest of the form
+  still works) while `demo_mode`/`demo_email`/`demo_password` stayed
+  exactly as they were and no hijack account was created. Then logged in
+  as a real (non-demo) admin and confirmed the block is visible and a
+  legitimate change to Demo Mode/credentials still works and correctly
+  re-provisions the existing demo account's password. All test accounts
+  and settings reset afterward.
+
 ## 2026-08-14 (7)
 
 **Demo Mode credentials can no longer drift out of sync with reality.**

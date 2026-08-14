@@ -16,6 +16,7 @@ class User extends Authenticatable
         'email',
         'password',
         'role',
+        'is_demo_account',
         'location_id',
         'employee_id',
         'phone',
@@ -45,6 +46,7 @@ class User extends Authenticatable
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
         'is_active' => 'boolean',
+        'is_demo_account' => 'boolean',
         'approved_at' => 'datetime',
         'last_login_at' => 'datetime',
     ];
@@ -92,6 +94,19 @@ class User extends Authenticatable
     public function isPosManager()
     {
         return $this->role === 'pos_manager';
+    }
+
+    /**
+     * True only for the account Settings > General > Demo Mode itself
+     * provisions - has full role=admin capability so a demo can actually
+     * showcase the software, but is barred from touching the Demo Mode
+     * block itself (see SettingsController::updateGeneral()), so a demo
+     * visitor can't disable the demo or change its own login and lock out
+     * whoever visits next.
+     */
+    public function isDemoAccount()
+    {
+        return (bool) $this->is_demo_account;
     }
 
     public function location()

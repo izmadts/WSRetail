@@ -107,6 +107,7 @@
                     <p class="mt-1 text-xs text-gray-500">When enabled, everyone gets a light/dark toggle in the top bar (their own choice, remembered on their own device). When disabled, the toggle is hidden and the panel stays light for everyone.</p>
                 </div>
 
+                @unless ($isDemoAccount)
                 <div class="border-t border-gray-200 pt-4" x-data="{ demo: {{ old('demo_mode', $settings['demo_mode']) ? 'true' : 'false' }} }">
                     <label class="flex items-center gap-2 cursor-pointer">
                         <input type="checkbox" name="demo_mode" value="1" x-model="demo"
@@ -141,6 +142,7 @@
                         </p>
                     </div>
                 </div>
+                @endunless
 
                 <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors duration-200">
                     <i class="fas fa-save mr-1"></i> Save Settings
