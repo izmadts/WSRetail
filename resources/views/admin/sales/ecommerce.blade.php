@@ -47,7 +47,13 @@
                         <td class="py-3 px-2 text-right font-medium text-gray-900">Rs. {{ number_format($sale->total_amount, 2) }}</td>
                         <td class="py-3 px-2 text-center"><span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $sale->status_color }}">{{ $sale->status_label }}</span></td>
                         <td class="py-3 px-2 text-center">
-                            <a href="{{ route('admin.sales.show', $sale) }}" class="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg inline-block"><i class="fas fa-eye text-sm"></i></a>
+                            <div class="flex items-center justify-center space-x-1">
+                                <a href="{{ route('admin.sales.show', $sale) }}" class="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg"><i class="fas fa-eye text-sm"></i></a>
+                                @if($sale->status != 'paid' && $sale->status != 'cancelled')
+                                <a href="{{ route('admin.sales.edit', $sale) }}" class="p-1.5 text-yellow-600 hover:bg-yellow-50 rounded-lg"><i class="fas fa-edit text-sm"></i></a>
+                                <form action="{{ route('admin.sales.destroy', $sale) }}" method="POST" class="inline">@csrf @method('DELETE')<button type="submit" onclick="return confirm('Are you sure?')" class="p-1.5 text-red-600 hover:bg-red-50 rounded-lg"><i class="fas fa-trash text-sm"></i></button></form>
+                                @endif
+                            </div>
                         </td>
                     </tr>
                     @endforeach

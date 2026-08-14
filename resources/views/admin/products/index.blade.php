@@ -37,6 +37,7 @@
             <table class="w-full" id="productsTable">
                 <thead>
                     <tr class="border-b border-gray-200">
+                        <th class="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-2">Image</th>
                         <th class="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-2">Code</th>
                         <th class="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-2">Name</th>
                         <th class="text-left text-xs font-medium text-gray-500 uppercase tracking-wider py-3 px-2">Category</th>
@@ -51,6 +52,16 @@
                 <tbody class="divide-y divide-gray-100">
                     @foreach($products as $product)
                     <tr class="hover:bg-gray-50 transition-colors duration-150">
+                        <td class="py-3 px-2">
+                            @if($product->image)
+                                <img src="{{ asset($product->image) }}" alt="{{ $product->name }}"
+                                     class="w-10 h-10 rounded-lg object-cover border border-gray-200">
+                            @else
+                                <div class="w-10 h-10 rounded-lg bg-gradient-to-r from-blue-500 to-blue-600 flex items-center justify-center text-white font-semibold text-sm">
+                                    {{ strtoupper(substr($product->name, 0, 1)) }}
+                                </div>
+                            @endif
+                        </td>
                         <td class="py-3 px-2">
                             <code class="text-xs bg-gray-100 px-2 py-1 rounded">{{ $product->code }}</code>
                         </td>
@@ -146,7 +157,8 @@
         if (document.getElementById('productsTable')) {
             new DataTable('#productsTable', {
                 pageLength: 25,
-                order: [[1, 'asc']],
+                order: [[2, 'asc']],
+                columnDefs: [{ targets: 0, orderable: false, searchable: false }],
                 language: {
                     search: "Search:",
                     lengthMenu: "Show _MENU_ entries",
