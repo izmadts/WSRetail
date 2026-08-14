@@ -708,7 +708,7 @@ class IntegrationImportService
             return;
         }
 
-        $newPath = '/products/' . $product->id;
+        $newPath = '/' . $product->slug;
         if ($oldPath === $newPath) {
             return;
         }
